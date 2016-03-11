@@ -1,0 +1,11 @@
+bin/
+build/
+dist/
+include/
+lib/
+local/
+man/
+*.egg-info
+*.pem
+*.pyc
+.*.sw?

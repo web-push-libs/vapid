@@ -1,0 +1,4 @@
+{
+    "aud": "https://my_site.example.com",
+    "sub": "mailto:admin@my_site.example.com"
+}

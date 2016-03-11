@@ -1,0 +1,4 @@
+nose
+coverage
+mock>=1.0.1
+flake8
