@@ -1,0 +1,33 @@
+html {font-family:Arial;}
+.section {position:relative; padding: .5em;
+      width:80%; margin:0 auto;}
+button{border:1px solid black; border-radius: 5pt; margin:5px; font-weight:bold}
+.section label {display:block;position:relative;right:0;}
+.section textarea {width:95%;white-space:pre-wrap;
+      position:relative; left:3%;
+      word-break:break-all;vertical-align:top;}
+.hidden {display:none;}
+.section label {width:13em;}
+#err {color:red;}
+.err {color:red; border:1px solid red;}
+#raw_claims{white-space:pre-wrap;}
+input {
+      transition: background-color;
+      border:1px solid #ccc;
+}
+@keyframes update {
+      from{background-color: auto;}
+      to { background-color: #ffd699;}
+}
+.updated {
+      background-color: auto;
+      border:1px solid #ccc;
+      animation-duration: 1s;
+      animation-name: update;
+      animation-iteration-count: 2;
+      animation-direction: alternate;
+}
+p{margin:0 3%; font-size:90%;}
+#result input {margin-left:3%; width:20em;}
+.good::after {content:" ✓"; font-weight:bold;color:green;}
+.bad::after {content:" !"; font-weight:bold;color:red;}
