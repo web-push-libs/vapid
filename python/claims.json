@@ -1,4 +1,4 @@
 {
-    "aud": "https://my_site.example.com",
-    "sub": "mailto:admin@my_site.example.com"
+    "aud": "https://catfacts.example.com",
+    "sub": "mailto:webpush_ops@catfacts.example.com"
 }

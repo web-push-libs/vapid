@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<title>VAPID verification page</title>
+<link href="https://developer.cdn.mozilla.net/static/build/styles/mdn.6ff34abfc698.css" rel="stylesheet" />
+<link href="style.css" rel="stylesheet" />
+</head>
+<body class="document">
+<main class="document">
+<div class="center">
+<div id="document-main">
+<h1>VAPID verification</h1>
+<div id="intro" class="section">
+    <p>This page helps construct or validate <a href="https://datatracker.ietf.org/doc/draft-thomson-webpush-vapid/">VAPID</a> header data.</p>
+</div>
+<div id="inputs" class="section">
+<h2>Headers</h2>
+    <p>The headers are sent with subscription updates. They provide the site information to associate with
+    this feed.</p>
+    <label for="auth">Authorization Header:</label>
+    <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
+    <label for="crypt">Crypto-Key Header:</label>
+    <p>The public key expressed after "p256ecdsa=" can associate this feed with the dashboard."</p>
+    <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
+    <div class="control">
+    <button id="check">Check headers</button>
+</div>
+</div>
+<div id="result" class="section">
+<h2>Claims</h2>
+    <p>Claims are the information a site uses to identify itself.
+    <div class="row">
+        <label for="aud" title="The full URL to your site."><b>Aud</b>ience:</label>
+        <p>The full URL to your site.</p>
+        <input name="aud" placeholder="https://push.example.com">
+    </div>
+    <div class="row">
+    <label for="sub" ><b>Sub</b>scriber:</label>
+    <p>The administrative email address that can be contacted if there's an issue</p>
+    <input name="sub" placeholder="mailto:admin@push.example.com">
+    </div>
+    <div class="row">
+    <label for="exp"><b>Exp</b>iration:</label>
+    <p>Time in seconds for this claim to live. (Max: 24 hours from now)</p>
+    <input name="exp" placeholder="Time in seconds">
+    </div>
+    <div class="control">
+    <button id="gen">Generate VAPID</button>
+    </div>
+    <h3>Claims JSON object:</h3>
+    <pre class="brush: js line-numbers lanuage-js">
+    <code id="raw_claims" >None</code>
+    </pre>
+    <div id="ignored" class="hidden">
+        <div class="title">The following were ignored.
+             <div class="items"></div>
+        </div>
+    </div>
+</div>
+<div id="keys" class="section">
+    <h2>Exported Keys</h2>
+<b>Auto-generated keys:</b>
+<p>These are ASN.1 DER formatted version of the public and private keys used to generate
+the VAPID headers. These can be useful for languages that use DER for key import.</p>
+    <label for="priv">Private Key:</label><textarea name="priv"></textarea>
+    <label for="pub">Public Key:</label><textarea name="pub"></textarea>
+</div>
+<div id="err" class="hidden section"></div>
+</div>
+</div>
+</main>
+<script src="vapid.js"></script>
+<script>
+
+let err_strs = {
+    enus: {
+        INVALID_EXP: "Invalid Expiration",
+        CLAIMS_FAIL: "Claims Failed",
+        HEADER_NOPE: "Could not generate headers",
+        BAD_AUTH_HE: "Missing Authorization Header",
+        BAD_CRYP_HE: "Missing Crypto-Key Header",
+        BAD_HEADERS: "Header check failed",
+    }
+}
+
+
+function error(ex=null, msg=null, clear=false) {
+    let er = document.getElementById("err");
+    if (clear) {
+        er.innerHTML = "";
+    }
+    if (msg) {
+        er.innerHTML += msg + "<br>";
+    }
+    if (ex) {
+        er.innerHTML += `${ex.name}: ${ex.message}</br>`;
+    }
+    er.classList.remove("hidden");
+}
+
+function success(claims) {
+    for (let n of ["aud", "sub", "exp"]) {
+        let item = document.getElementsByName(n)[0];
+        item.value = claims[n];
+        item.classList.add("updated");
+        delete (claims[n]);
+    }
+    let err = document.getElementById("err");
+    err.innerHTML = "";
+    err.classList.add("hidden");
+    let extra = JSON.stringify(claims, "    ");
+    if (extra.length > 2) {
+        let ignored = document.getElementsById("ignored");
+        ignored.getElementsByClassName("items")
+            .innerHTML = extra;
+        ignored.classList.remove("hidden");
+    }
+}
+
+
+function fetchAuth(){
+    let auth = document.getElementsByName("auth")[0];
+    if (!auth) {
+        return null
+    }
+    if (auth.value.split('.').length != 3) {
+        throw new Error("Malformed Header");
+    }
+    return auth.value;
+}
+
+function fetchCrypt(){
+    let crypt = document.getElementsByName("crypt")[0];
+    if (! crypt) {
+        return null
+    }
+    return crypt.value;
+}
+
+function fetchClaims(){
+    let claims = document.getElementById("result").getElementsByTagName("input");
+    let reply = {};
+    let err = false;
+    error(null, null, true);
+    for (item of claims) {
+        reply[item.name] = item.value;
+    }
+
+    // verify aud
+    if (! /^https?:\/\//.test(reply['aud'])) {
+        error(null,
+            `Invalid Audience: Use the full URL of your site e.g. "http://example.com"`);
+        document.getElementsByName("aud")[0].classList.add("err");
+        err = true;
+    } else {
+        document.getElementsByName("aud")[0].classList.remove("err");
+    }
+    // verify sub
+    if (! /^mailto:.+@.+/.test(reply['sub'])) {
+        error(null,
+            `Invalid Subscriber: Use the email address of your site's ` +
+            `administrative contact as a link (e.g. "mailto:admin@example.com"`);
+        document.getElementsByName("sub")[0].classList.add("err");
+        err = true;
+    } else {
+        document.getElementsByName("sub")[0].classList.remove("err");
+    }
+
+    // verify exp
+    try {
+        let expry = parseInt(reply['exp']);
+        let now = parseInt(Date.now() * .001);
+        if (! expry) {
+            document.getElementsByName("exp")[0].value = now + 86400;
+            reply['exp'] = now + 86400;
+        }
+        if (expry < now) {
+            error(null,
+               `Invalid Expiration: Already expired.`);
+            err = true;
+
+        }
+    } catch (ex) {
+        error(ex, err_strs.enus.INVAPID_EXP);
+        err = true;
+    }
+    if (err) {
+        return null;
+    }
+    return reply
+}
+
+function gen(){
+    // clear the headers
+    for (h of document.getElementById("inputs").getElementsByTagName("textarea")) {
+        h.value = "";
+        h.classList.remove("updated");
+    }
+    let claims = fetchClaims();
+     if (! claims) {
+         return
+     }
+     try {
+         let rclaims = document.getElementById("raw_claims");
+         rclaims.innerHTML = JSON.stringify(claims, null, "    ");
+         rclaims.classList.add("updated");
+         vapid.generate_keys().then(x => {
+             vapid.export_private_der()
+                 .then(k => document.getElementsByName("priv")[0].value = k)
+                 .catch(er => error(er, "Private Key export failed"));
+            vapid.export_public_der()
+                 .then(k => document.getElementsByName("pub")[0].value = k)
+                .catch(er => error(er, "Public key export failed" ));
+             vapid.sign(claims)
+                .then(k => {
+                 let auth = document.getElementsByName("auth")[0]
+                 auth.value = k.authorization;
+                 auth.classList.add('updated');
+                 let crypt = document.getElementsByName("crypt")[0]
+                 crypt.value = k["crypto-key"];
+                 crypt.classList.add('updated');
+                })
+               .catch(err => error(err, err_strs.enus.CLAIMS_FAIL));
+             });
+     } catch (ex) {
+         error(ex, err_strs.enus.HEADER_NOPE);
+     }
+}
+
+function check(){
+    try {
+        // clear claims
+        for (let item of document
+                .getElementById("result").getElementsByTagName("input")) {
+            item.value = "";
+            item.classList.remove("updated");
+        }
+        // clear keys
+        for (let item of document.getElementById("keys")
+                .getElementsByTagName("textarea")) {
+            item.value = "";
+            item.classList.remove("updated");
+        }
+        let token = fetchAuth();
+        let public_key = fetchCrypt();
+        if ((token == null) && (pubic_key == null)) {
+            if (token == null){
+                error(null, err_strs.enus.BAD_AUTH_HE);
+                return
+            }
+            failure(null, err_strs.enus.BAD_CRYP_HE);
+            return
+        }
+        vapid.verify(token, public_key)
+            .then(k => success(k))
+            .catch(err => error(err, err_strs.enus.BAD_HEADERS));
+    } catch (e) {
+        error(e, "Header check failed");
+    }
+}
+
+document.getElementById("check").addEventListener("click", check);
+document.getElementById("gen").addEventListener("click", gen);
+
+
+</script>
+</body>
+</html>

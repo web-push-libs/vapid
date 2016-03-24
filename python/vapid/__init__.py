@@ -33,7 +33,6 @@ class Vapid(object):
                 self.private_key = ecdsa.SigningKey.from_pem(
                     open(private_key_file).read())
             except Exception, exc:
-                import pdb;pdb.set_trace()
                 logging.error("Could not open private key file: %s", repr(exc))
                 raise VapidException(exc)
             self.pubilcKey = self.private_key.get_verifying_key()
@@ -78,7 +77,10 @@ class Vapid(object):
         file.close()
 
     def validate(self, token):
-        return base64.urlsafe_b64encode(self.private_key.sign(token))
+        try:
+            return jws.verify(token, self.public_key, algorithms=["ES256"]);
+        except Exception as e:
+            raise VapidException(e)
 
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
