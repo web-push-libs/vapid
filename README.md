@@ -22,4 +22,6 @@ information about your WebPush feed, for instance:
 ```
 
 You then convert that to a [JWT](https://tools.ietf.org/html/rfc7519) encoded
-with `alg = "ES256"`
+with`alg = "ES256"`. The resulting token is the `Authorization` header
+"Bearer ..." token, the Public Key used to sign the JWT is added to
+the `Crypto-Key` set as "p256ecdsa=..."

@@ -65,17 +65,18 @@ class VapidTestCase(unittest.TestCase):
 
     def test_validate(self):
         v = Vapid("/tmp/private")
-        msg = "foobar"
-        vtoken = v.validate(msg)
-        ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken), msg))
+        claims = {"aud": "example.com", "sub": "admin@example.com"}
+        result = jws.sign(claims, v.private_key, algorithm="ES256")
+        msg = v.validate(result)
+        eq_(claims, json.loads(msg))
 
     def test_sign(self):
         v = Vapid("/tmp/private")
-        claims = {"aud":"example.com", "sub":"admin@example.com"}
+        claims = {"aud": "example.com", "sub": "admin@example.com"}
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
             'p256ecdsa=EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy'
-             'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
+            'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
         items = jws.verify(result['Authorization'][7:],
                            v.public_key,
                            algorithms=["ES256"])
