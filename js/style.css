@@ -10,8 +10,9 @@ button{border:1px solid black; border-radius: 5pt; margin:5px; font-weight:bold}
 .section label {width:13em;}
 #err {color:red;}
 .err {color:red; border:1px solid red;}
+#raw_claims{white-space:pre-wrap;}
 input {
-      transition: background-color; 
+      transition: background-color;
       border:1px solid #ccc;
 }
 @keyframes update {
@@ -20,7 +21,6 @@ input {
 }
 .updated {
       background-color: auto;
-      border:1px solid #ccc;
       animation-duration: 1s;
       animation-name: update;
       animation-iteration-count: 2;

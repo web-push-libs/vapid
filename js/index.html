@@ -2,23 +2,33 @@
 <head>
 <meta charset="utf-8">
 <title>VAPID verification page</title>
+<link href="https://developer.cdn.mozilla.net/static/build/styles/mdn.6ff34abfc698.css" rel="stylesheet" />
 <link href="style.css" rel="stylesheet" />
 </head>
-<body>
+<body class="document">
+<main class="document">
+<div class="center">
+<div id="document-main">
 <h1>VAPID verification</h1>
 <div id="intro" class="section">
     <p>This page helps construct or validate <a href="https://datatracker.ietf.org/doc/draft-thomson-webpush-vapid/">VAPID</a> header data.</p>
 </div>
 <div id="inputs" class="section">
+<h2>Headers</h2>
+    <p>The headers are sent with subscription updates. They provide the site information to associate with
+    this feed.</p>
     <label for="auth">Authorization Header:</label>
     <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
     <label for="crypt">Crypto-Key Header:</label>
+    <p>The public key expressed after "p256ecdsa=" can associate this feed with the dashboard."</p>
     <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
     <div class="control">
     <button id="check">Check headers</button>
 </div>
 </div>
 <div id="result" class="section">
+<h2>Claims</h2>
+    <p>Claims are the information a site uses to identify itself.
     <div class="row">
         <label for="aud" title="The full URL to your site."><b>Aud</b>ience:</label>
         <p>The full URL to your site.</p>
@@ -37,6 +47,10 @@
     <div class="control">
     <button id="gen">Generate VAPID</button>
     </div>
+    <h3>Claims JSON object:</h3>
+    <pre class="brush: js line-numbers lanuage-js">
+    <code id="raw_claims" >None</code>
+    </pre>
     <div id="ignored" class="hidden">
         <div class="title">The following were ignored.
              <div class="items"></div>
@@ -44,6 +58,7 @@
     </div>
 </div>
 <div id="keys" class="section">
+    <h2>Exported Keys</h2>
 <b>Auto-generated keys:</b>
 <p>These are ASN.1 DER formatted version of the public and private keys used to generate
 the VAPID headers. These can be useful for languages that use DER for key import.</p>
@@ -51,8 +66,23 @@ the VAPID headers. These can be useful for languages that use DER for key import
     <label for="pub">Public Key:</label><textarea name="pub"></textarea>
 </div>
 <div id="err" class="hidden section"></div>
+</div>
+</div>
+</main>
 <script src="vapid.js"></script>
 <script>
+
+let err_strs = {
+    enus: {
+        INVALID_EXP: "Invalid Expiration",
+        CLAIMS_FAIL: "Claims Failed",
+        HEADER_NOPE: "Could not generate headers",
+        BAD_AUTH_HE: "Missing Authorization Header",
+        BAD_CRYP_HE: "Missing Crypto-Key Header",
+        BAD_HEADERS: "Header check failed",
+    }
+}
+
 
 function error(ex=null, msg=null, clear=false) {
     let er = document.getElementById("err");
@@ -151,7 +181,7 @@ function fetchClaims(){
 
         }
     } catch (ex) {
-        error(ex, "Invalid Expiration");
+        error(ex, err_strs.enus.INVAPID_EXP);
         err = true;
     }
     if (err) {
@@ -171,6 +201,9 @@ function gen(){
          return
      }
      try {
+         let rclaims = document.getElementById("raw_claims");
+         rclaims.innerHTML = JSON.stringify(claims, null, "    ");
+         rclaims.classList.add("updated");
          vapid.generate_keys().then(x => {
              vapid.export_private_der()
                  .then(k => document.getElementsByName("priv")[0].value = k)
@@ -187,10 +220,10 @@ function gen(){
                  crypt.value = k["crypto-key"];
                  crypt.classList.add('updated');
                 })
-               .catch(err => error(err, "Claims failed"));
+               .catch(err => error(err, err_strs.enus.CLAIMS_FAIL));
              });
      } catch (ex) {
-         error(ex, "Could not generate headers");
+         error(ex, err_strs.enus.HEADER_NOPE);
      }
 }
 
@@ -212,15 +245,15 @@ function check(){
         let public_key = fetchCrypt();
         if ((token == null) && (pubic_key == null)) {
             if (token == null){
-                error(null, "Missing Authorization Header");
+                error(null, err_strs.enus.BAD_AUTH_HE);
                 return
             }
-            failure(null, "Missing Crypto-Key Header");
+            failure(null, err_strs.enus.BAD_CRYP_HE);
             return
         }
         vapid.verify(token, public_key)
             .then(k => success(k))
-            .catch(err => error(err, "Header check failed"));
+            .catch(err => error(err, err_strs.enus.BAD_HEADERS));
     } catch (e) {
         error(e, "Header check failed");
     }

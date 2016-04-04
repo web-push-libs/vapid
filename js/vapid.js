@@ -19,6 +19,22 @@ function chr(c){
 var vapid = {
     /* Generate and verify a VAPID token */
 
+    errs: {
+        enus: {
+            OK_VAPID_KEYS: "VAPID Keys defined.",
+            ERR_VAPID_KEY: "VAPID generate keys error: ",
+            ERR_PUB_R_KEY: "Invalid Public Key record. Please use a valid RAW Formatted record.",
+            ERR_PUB_D_KEY: "Invalid Public Key record. Please use a valid DER Formatted record.",
+            ERR_NO_KEYS: "No keys defined. Please use generate_keys() or load a public key.",
+            ERR_CLAIM_MIS: "Claim missing ",
+            ERR_SIGN: "Sign error",
+            ERR_VERIFY_SG: "Verify Error: Auth signature invalid: ",
+            ERR_VERIFY_KE: "Verify Error: Key invalid: ",
+            ERR_SIGNATURE: "Signature Invalid",
+            ERR_VERIFY: "Verify error",
+        }
+    },
+
     _private_key:  "",
     _public_key: "",
 
@@ -32,10 +48,10 @@ var vapid = {
            .then(keys => {
               this._private_key = keys.privateKey;
               this._public_key = keys.publicKey;
-              console.info("VAPID Keys defined.");
+              console.info(this.errs.enus.OK_VAPID_KEYS);
            })
            .catch(fail => {
-               console.error("VAPID generate keys error:", fail);
+               console.error(this.errs.enus.ERR_VAPID_KEY, fail);
                });
     },
 
@@ -138,7 +154,7 @@ var vapid = {
         if (typeof(raw) == "string") {
             raw = this.url_atob(raw);
         }
-        let err = new Error("Invalid Public Key record. Please use a valid RAW Formatted record.");
+        let err = new Error(this.errs.enus.ERR_PUB_KEY);
 
         // Raw is supposed to start with a 0x04, but some libraries don't. sigh.
         if (raw.length == 65 && raw[0] != 4) {
@@ -173,7 +189,7 @@ var vapid = {
             derArray = this.url_atob(derArray);
         }
         /* Super light weight public key import function */
-        let err = new Error("Invalid Public Key record. Please use a valid DER Formatted record.");
+        let err = new Error(this.errs.enus.ERR_PUB_D_KEY);
         // Does the record begin with "\x30"
         if (derArray[0] != 48) { throw err}
         // is this an ECDSA record? (looking for \x2a and \x86
@@ -212,14 +228,14 @@ var vapid = {
          * to specify VAPID auth.
         */
         if (this._public_key == "") {
-            throw new Error("No keys defined. Please use generate_keys() or load a public key.");
+            throw new Error(this.errs.enus.ERR_NO_KEYS);
         }
         if (!claims.hasOwnProperty("exp")) {
             claims.exp = parseInt(Date.now()*.001) + 86400;
         }
         ["sub","aud"].forEach(function(key){
             if (! claims.hasOwnProperty(key)) {
-                throw new Error("Claim missing ", key);
+                throw new Error(this.errs.enus.ERR_CLAIM_MIS, key);
             }
         })
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
@@ -248,7 +264,7 @@ var vapid = {
                     })
             })
             .catch(err => {
-                console.error("Sign error", err);
+                console.error(this.errs.enus.ERR_SIGN, err);
             })
     },
 
@@ -284,7 +300,7 @@ var vapid = {
                 });
         }
         if (this._public_key == "") {
-            throw new Error("No keys defined. Please use generate_keys() or load a private key.");
+            throw new Error(this.errs.enus.ERR_NO_KEYS);
         }
 
         let alg = { name: "ECDSA", namedCurve: "P-256", hash: "SHA-256" };
@@ -294,12 +310,12 @@ var vapid = {
         try {
             signature = this.url_atob(items[2]);
         } catch (err) {
-            throw new Error("Verify error: Auth Signature Invalid: " + err.message);
+            throw new Error(this.errs.enus.ERR_VERIFY_SG + err.message);
         }
         try {
             key = this.url_atob(items[1]);
         } catch (err) {
-            throw new Error("Verify error: Key Invalid: " + err.message);
+            throw new Error(this.errs.enus.ERR_VERIFY_KE + err.message);
         }
         let content = items.slice(0,2).join('.');
         let signatory = this._str_to_array(content);
@@ -313,11 +329,11 @@ var vapid = {
                    return JSON.parse(String.fromCharCode
                                         .apply(null, this.url_atob(items[1])))
                }
-               throw new Error("Signature Invalid");
+               throw new Error(this.errs.enus.ERR_SIGNATURE);
            })
            .catch(err => {
-               console.error("Verify error", err);
-               throw new Error ("Verify error: " + err.message);
+               console.error(this.errs.enus.ERR_VERIFY, err);
+               throw new Error (this.errs.enus.ERR_VERIFY + ": " + err.message);
            });
     }
 }
