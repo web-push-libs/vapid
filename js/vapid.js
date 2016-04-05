@@ -99,10 +99,10 @@ var vapid = {
         return webCrypto.exportKey("jwk", this._private_key)
             .then(k => {
                 // verifying key
-                let xv = this.url_atob(k.x);
-                let yv = this.url_atob(k.y);
+                let xv = String.fromCharCode.apply(null, this.url_atob(k.x));
+                let yv = String.fromCharCode.apply(null, this.url_atob(k.y));
                 // private key
-                let dv = this.url_atob(k.d);
+                let dv = String.fromCharCode.apply(null, this.url_atob(k.d));
 
                 // verifying key (public)
                 let vk = '\x00\x04' + xv + yv;
