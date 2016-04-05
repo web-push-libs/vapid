@@ -21,7 +21,7 @@ class Vapid(object):
     _private_key = None
     _public_key = None
 
-    def __init__(self, private_key_file=None):
+    def __init__(self, private_key_file=None, private_key=None):
         """Initialize VAPID using an optional file containing a private key
         in PEM format.
 
@@ -29,13 +29,14 @@ class Vapid(object):
         private key
         """
         if private_key_file:
+            private_key = open(private_key_file).read()
+        if private_key:
             try:
-                self.private_key = ecdsa.SigningKey.from_pem(
-                    open(private_key_file).read())
+                self._private_key = ecdsa.SigningKey.from_pem(private_key)
             except Exception, exc:
                 logging.error("Could not open private key file: %s", repr(exc))
                 raise VapidException(exc)
-            self.pubilcKey = self.private_key.get_verifying_key()
+            self._pubilcKey = self._private_key.get_verifying_key()
 
     @property
     def private_key(self):
@@ -72,15 +73,12 @@ class Vapid(object):
 
         :param key_file: The name of the file to save the public key
         """
-        file = open(key_file, "w")
-        file.write(self.public_key.to_pem())
-        file.close()
+        with open(key_file, "w") as file:
+            file.write(self.public_key.to_pem())
+            file.close()
 
     def validate(self, token):
-        try:
-            return jws.verify(token, self.public_key, algorithms=["ES256"]);
-        except Exception as e:
-            raise VapidException(e)
+        return base64.urlsafe_b64encode(self.private_key.sign(token))
 
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
@@ -105,11 +103,9 @@ class Vapid(object):
         pkey = 'p256ecdsa='
         pkey += base64.urlsafe_b64encode(self.public_key.to_string())
         if crypto_key:
-            crypto_key = crypto_key + ';' + pkey
+            crypto_key = crypto_key + ',' + pkey
         else:
             crypto_key = pkey
 
         return {"Authorization": "Bearer " + sig.strip('='),
                 "Crypto-Key": crypto_key}
-
-
