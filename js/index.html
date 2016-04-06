@@ -20,9 +20,12 @@
     <label for="auth">Authorization Header:</label>
     <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
     <label for="crypt">Crypto-Key Header:</label>
-    <p>The public key expressed after "p256ecdsa=" can associate this feed with the dashboard."</p>
+    <p>The public key expressed after "p256ecdsa=" can associate this feed with the dashboard.</p>
     <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
     <div class="control">
+    <label for="publicKey">Public Key:</label>
+    <p>This is the public key you'd use for the Dashboard</p>
+    <textarea name="publicKey" placeholder="abCDef..." readonly=true></textarea>
     <button id="check">Check headers</button>
 </div>
 </div>
@@ -61,9 +64,9 @@
     <h2>Exported Keys</h2>
 <b>Auto-generated keys:</b>
 <p>These are ASN.1 DER formatted version of the public and private keys used to generate
-the VAPID headers. These can be useful for languages that use DER for key import.</p>
-    <label for="priv">Private Key:</label><textarea name="priv"></textarea>
-    <label for="pub">Public Key:</label><textarea name="pub"></textarea>
+the VAPID headers. These can be useful for languages that use DER or PEM for key import.</p>
+    <label for="priv">DER Private Key:</label><textarea name="priv"></textarea>
+    <label for="pub">DER Public Key:</label><textarea name="pub"></textarea>
 </div>
 <div id="err" class="hidden section"></div>
 </div>
@@ -212,12 +215,16 @@ function gen(){
                 .catch(er => error(er, "Public key export failed" ));
              vapid.sign(claims)
                 .then(k => {
-                 let auth = document.getElementsByName("auth")[0]
+                 let auth = document.getElementsByName("auth")[0];
                  auth.value = k.authorization;
                  auth.classList.add('updated');
-                 let crypt = document.getElementsByName("crypt")[0]
+                 let crypt = document.getElementsByName("crypt")[0];
                  crypt.value = k["crypto-key"];
                  crypt.classList.add('updated');
+                 let pk = document.getElementsByName("publicKey")[0];
+                 // Public Key is the crypto key minus the 'p256ecdsa='
+                 pk.value = k.publicKey;
+                 pk.classList.add('updated');
                 })
                .catch(err => error(err, err_strs.enus.CLAIMS_FAIL));
              });

@@ -257,9 +257,11 @@ var vapid = {
                  */
                 return webCrypto.exportKey('raw', this._public_key)
                     .then( key => {
+                        let pubKey = this.url_btoa(key);
                         return {
                             authorization: "Bearer " + content + "." + sig,
-                            "crypto-key": "p256ecdsa=" + this.url_btoa(key),
+                            "crypto-key": "p256ecdsa=" + pubKey,
+                            publicKey: pubKey,
                         }
                     })
             })
