@@ -78,6 +78,7 @@ class Vapid(object):
             file.close()
 
     def validate(self, token):
+        """Sign a Valdiation token from the dashboard"""
         return base64.urlsafe_b64encode(self.private_key.sign(token))
 
     def sign(self, claims, crypto_key=None):
