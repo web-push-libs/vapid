@@ -44,8 +44,8 @@
     </div>
     <div class="row">
     <label for="exp"><b>Exp</b>iration:</label>
-    <p>Time in seconds for this claim to live. (Max: 24 hours from now)</p>
-    <input name="exp" placeholder="Time in seconds">
+    <p>Time in seconds for this claim to live. (Default/Max: 24 hours from now)</p>
+    <input name="exp" id="vapid_exp" placeholder="Time in seconds">
     </div>
     <div class="control">
     <button id="gen">Generate VAPID</button>
@@ -267,6 +267,7 @@ function check(){
 
 document.getElementById("check").addEventListener("click", check);
 document.getElementById("gen").addEventListener("click", gen);
+document.getElementById('vapid_exp').value = parseInt(Date.now()*.001) + 86400;
 
 
 </script>
