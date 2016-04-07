@@ -150,6 +150,13 @@ var vapid = {
             });
     },
 
+    export_public_raw: function() {
+        return webCrypto.exportKey('raw', this._public_key)
+            .then( key => {
+                return this.url_btoa(key);
+            })
+    },
+
     import_public_raw: function(raw) {
         if (typeof(raw) == "string") {
             raw = this.url_atob(raw);
@@ -268,6 +275,17 @@ var vapid = {
             .catch(err => {
                 console.error(this.errs.enus.ERR_SIGN, err);
             })
+    },
+
+    signString: function(string) {
+        /* Sign the token for the developer Dashboard */
+        let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
+        return webCrypto.sign(alg, this._private_key,
+                this._str_to_array(string))
+            .then(signed => {
+                let sig = this.url_btoa(signed);
+                return sig;
+            });
     },
 
     verify: function(token, public_key=null) {
