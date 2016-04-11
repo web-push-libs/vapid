@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import json
 import unittest
@@ -6,7 +7,7 @@ from nose.tools import eq_, ok_
 from mock import patch
 
 from jose import jws
-from vapid import Vapid, VapidException
+from py_vapid import Vapid, VapidException
 
 T_PRIVATE = """-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIPeN1iAipHbt8+/KZ2NIF8NeN24jqAmnMLFZEMocY8RboAoGCCqGSM49
@@ -20,6 +21,9 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hb
 WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 -----END PUBLIC KEY-----
 """
+
+T_PUBLIC_RAW = """EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy\
+KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ=="""
 
 
 def setUp(self):
@@ -88,7 +92,9 @@ class VapidTestCase(unittest.TestCase):
         v = Vapid("/tmp/private")
         msg = "foobar"
         vtoken = v.validate(msg)
-        ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken), msg))
+        ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken),
+                                msg,
+                                hashfunc=hashlib.sha256))
 
     def test_sign(self):
         v = Vapid("/tmp/private")
@@ -96,16 +102,14 @@ class VapidTestCase(unittest.TestCase):
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
             'id=previous,'
-            'p256ecdsa=EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy'
-            'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
+            'p256ecdsa=' + T_PUBLIC_RAW)
         items = jws.verify(result['Authorization'][7:],
                            v.public_key,
                            algorithms=["ES256"])
         eq_(json.loads(items), claims)
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
-            'p256ecdsa=EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy'
-            'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
+            'p256ecdsa=' + T_PUBLIC_RAW)
 
     def test_bad_sign(self):
         v = Vapid("/tmp/private")

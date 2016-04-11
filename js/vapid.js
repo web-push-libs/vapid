@@ -21,7 +21,7 @@ var vapid = {
     enus: {
         info: {
             OK_VAPID_KEYS: "VAPID Keys defined.",
-        }
+        },
         errs: {
             ERR_VAPID_KEY: "VAPID generate keys error: ",
             ERR_PUB_R_KEY: "Invalid Public Key record. Please use a valid RAW Formatted record.",
@@ -35,8 +35,6 @@ var vapid = {
             ERR_VERIFY: "Verify error",
         }
     },
-
-    lang: this.enus;
 
     _private_key:  "",
     _public_key: "",
@@ -59,23 +57,6 @@ var vapid = {
                });
     },
 
-    url_btoa: function(data) {
-        /* Convert a binary array into a URL safe base64 string */
-        if (data instanceof ArrayBuffer || data instanceof Uint8Array){
-            data = String.fromCharCode.apply(null, new Uint8Array(data))
-        }
-        let reply = btoa(data).replace(/\+/g, "-").replace(/\//g, "_");
-        return reply
-    },
-
-    url_atob: function(data) {
-        /* return a binary array from a URL safe base64 string */
-        let reply = this._str_to_array(atob(data
-                                       .replace(/\-/g, "+")
-                                       .replace(/\_/g, "/")));
-        return reply
-    },
-
     _str_to_array: function(str) {
         /* convert a string into a ByteArray
          *
@@ -88,6 +69,26 @@ var vapid = {
             reply[i] = String.charCodeAt(split[i]);
         }
         return reply;
+    },
+
+    _array_to_str: function(array) {
+        /* convert a ByteArray into a string
+         */
+        return String.fromCharCode.apply(null, new Uint8Array(array));
+    },
+
+    toUrlBase64: function(data) {
+        /* Convert a binary array into a URL safe base64 string */
+        return btoa(data)
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_");
+    },
+
+    fromUrlBase64: function(data) {
+        /* return a binary array from a URL safe base64 string */
+        return this._str_to_array(atob(data
+                                       .replace(/\-/g, "+")
+                                       .replace(/\_/g, "/")));
     },
 
     /* A fully featured DER library is available at
@@ -103,10 +104,10 @@ var vapid = {
         return webCrypto.exportKey("jwk", this._private_key)
             .then(k => {
                 // verifying key
-                let xv = String.fromCharCode.apply(null, this.url_atob(k.x));
-                let yv = String.fromCharCode.apply(null, this.url_atob(k.y));
+                let xv = String.fromCharCode.apply(null, this.fromUrlBase64(k.x));
+                let yv = String.fromCharCode.apply(null, this.fromUrlBase64(k.y));
                 // private key
-                let dv = String.fromCharCode.apply(null, this.url_atob(k.d));
+                let dv = String.fromCharCode.apply(null, this.fromUrlBase64(k.d));
 
                 // verifying key (public)
                 let vk = '\x00\x04' + xv + yv;
@@ -125,7 +126,7 @@ var vapid = {
                 // \x30 is a sequence start.
                 let seq = int1 + dvstr + curve_oid_const + vk_const;
                 let rder = "\x30" + chr(seq.length) + seq;
-                return this.url_btoa(rder);
+                return this.toUrlBase64(rder);
             })
             .catch(err => console.error(err))
     },
@@ -135,8 +136,8 @@ var vapid = {
         return webCrypto.exportKey("jwk", this._public_key)
             .then(k => {
                 // raw keys always begin with a 4
-                let xv = this.url_atob(k.x);
-                let yv = this.url_atob(k.y);
+                let xv = this.fromUrlBase64(k.x);
+                let yv = this.fromUrlBase64(k.y);
 
                 let point = "\x00\x04" +
                     String.fromCharCode.apply(null, xv) +
@@ -149,7 +150,7 @@ var vapid = {
                 let encPoint = "\x03" + chr(point.length) + point
                 let rder = "\x30" + chr(prefix.length + encPoint.length) +
                     prefix + encPoint;
-                let der = this.url_btoa(rder);
+                let der = this.toUrlBase64(rder);
                 return der;
             });
     },
@@ -157,13 +158,13 @@ var vapid = {
     export_public_raw: function() {
         return webCrypto.exportKey('raw', this._public_key)
             .then( key => {
-                return this.url_btoa(key);
+                return this.toUrlBase64(this._array_to_str(key));
             })
     },
 
     import_public_raw: function(raw) {
         if (typeof(raw) == "string") {
-            raw = this.url_atob(raw);
+            raw = this.fromUrlBase64(raw);
         }
         let err = new Error(this.lang.errs.ERR_PUB_KEY);
 
@@ -173,8 +174,8 @@ var vapid = {
         }
 
         raw= raw.slice(-64);
-        let x = this.url_btoa(String.fromCharCode.apply(null, raw.slice(0,32)));
-        let y = this.url_btoa(String.fromCharCode.apply(null, raw.slice(32,64)));
+        let x = this.toUrlBase64(String.fromCharCode.apply(null, raw.slice(0,32)));
+        let y = this.toUrlBase64(String.fromCharCode.apply(null, raw.slice(32,64)));
 
         // Convert to a JWK and import it.
         let jwk = {
@@ -187,6 +188,7 @@ var vapid = {
         };
 
         return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
+            .then(k => this._public_key = k)
     },
 
 
@@ -197,7 +199,7 @@ var vapid = {
          * Returns a promise containing the public key.
          */
         if (typeof(derArray) == "string") {
-            derArray = this.url_atob(derArray);
+            derArray = this.fromUrlBase64(derArray);
         }
         /* Super light weight public key import function */
         let err = new Error(this.lang.errs.ERR_PUB_D_KEY);
@@ -212,10 +214,10 @@ var vapid = {
             throw err;
         }
         // pubkey offset starts at byte 25
-        let x = btoa(String.fromCharCode.apply(null, derArray.slice(27, 27+32)))
-            .replace(/\+/g, "-").replace(/\//g, "_");
-        let y = btoa(String.fromCharCode.apply(null, derArray.slice(27+32, 27+64)))
-            .replace(/\+/g, "-").replace(/\//g, "_");
+        let x = this.toUrlBase64(String.fromCharCode
+                .apply(null, derArray.slice(27, 27+32)));
+        let y = this.toUrlBase64(String.fromCharCode
+                .apply(null, derArray.slice(27+32, 27+64)));
 
         // Convert to a JWK and import it.
         let jwk = {
@@ -250,16 +252,16 @@ var vapid = {
             }
         })
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let headStr = JSON.stringify({typ:"JWT",alg:"ES256"});
-        let claimStr = JSON.stringify(claims);
-        let content = this.url_btoa(headStr) + "." + this.url_btoa(claimStr);
+        let headStr = btoa(JSON.stringify({typ:"JWT",alg:"ES256"}));
+        let claimStr = btoa(JSON.stringify(claims));
+        let content = headStr + "." + claimStr;
         let signatory = this._str_to_array(content);
         return webCrypto.sign(
             alg,
             this._private_key,
             signatory)
             .then(signature => {
-                let sig = this.url_btoa(signature);
+                let sig = this.toUrlBase64(this._array_to_str(signature));
                 /* The headers consist of the constructed JWT as the "authorization"
                  * and the raw Public key as the p256ecdsa element of "Crypto-Key"
                  * Note that Crypto-Key can contain many elements, separated by a ","
@@ -268,7 +270,7 @@ var vapid = {
                  */
                 return webCrypto.exportKey('raw', this._public_key)
                     .then( key => {
-                        let pubKey = this.url_btoa(key);
+                        let pubKey = this.toUrlBase64(this._array_to_str(key));
                         return {
                             authorization: "Bearer " + content + "." + sig,
                             "crypto-key": "p256ecdsa=" + pubKey,
@@ -284,10 +286,10 @@ var vapid = {
     validate: function(string) {
         /* Sign the token for the developer Dashboard */
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let t2v = this.url_atob(string);
+        let t2v = this._str_to_array(string);
         return webCrypto.sign(alg, this._private_key, t2v)
             .then(signed => {
-                let sig = this.url_btoa(signed);
+                let sig = this.toUrlBase64(this._array_to_str(signed));
                 return sig;
             });
     },
@@ -295,8 +297,8 @@ var vapid = {
     validateCheck: function(sig, string) {
         /* verify a given signature string matches */
         let alg = { name: "ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let vsig = this.url_atob(sig);
-        let t2v = this.url_atob(string);
+        let vsig = this.fromUrlBase64(sig);
+        let t2v = this.fromUrlBase64(string);
         return webCrypto.verify(alg, this._public_key, vsig, t2v);
     },
 
@@ -340,12 +342,12 @@ var vapid = {
         let signature;
         let key;
         try {
-            signature = this.url_atob(items[2]);
+            signature = this.fromUrlBase64(items[2]);
         } catch (err) {
             throw new Error(this.lang.errs.ERR_VERIFY_SG + err.message);
         }
         try {
-            key = this.url_atob(items[1]);
+            key = this.fromUrlBase64(items[1]);
         } catch (err) {
             throw new Error(this.lang.errs.ERR_VERIFY_KE + err.message);
         }
@@ -359,7 +361,7 @@ var vapid = {
            .then(valid => {
                if (valid) {
                    return JSON.parse(String.fromCharCode
-                                        .apply(null, this.url_atob(items[1])))
+                                        .apply(null, this.fromUrlBase64(items[1])))
                }
                throw new Error(this.lang.errs.ERR_SIGNATURE);
            })
@@ -369,3 +371,5 @@ var vapid = {
            });
     }
 }
+
+vapid.lang = vapid.enus;

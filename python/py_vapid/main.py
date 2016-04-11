@@ -6,7 +6,7 @@ import argparse
 import os
 import json
 
-from vapid import Vapid
+from py_vapid import Vapid
 
 
 def main():

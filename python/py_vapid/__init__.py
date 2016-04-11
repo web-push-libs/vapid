@@ -4,12 +4,13 @@
 
 import base64
 import time
+import hashlib
 
 import ecdsa
 import logging
 from jose import jws
 
-__version__ = "0.1"
+__version__ = "0.2"
 
 
 class VapidException(Exception):
@@ -20,6 +21,7 @@ class Vapid(object):
     """Minimal VAPID signature generation library. """
     _private_key = None
     _public_key = None
+    _hasher = hashlib.sha256
 
     def __init__(self, private_key_file=None, private_key=None):
         """Initialize VAPID using an optional file containing a private key
@@ -32,7 +34,12 @@ class Vapid(object):
             private_key = open(private_key_file).read()
         if private_key:
             try:
-                self._private_key = ecdsa.SigningKey.from_pem(private_key)
+                if "BEGIN EC" in private_key:
+                    self._private_key = ecdsa.SigningKey.from_pem(private_key)
+                else:
+                    self._private_key = \
+                        ecdsa.SigningKey.from_der(
+                            base64.urlsafe_b64decode(private_key))
             except Exception, exc:
                 logging.error("Could not open private key file: %s", repr(exc))
                 raise VapidException(exc)
@@ -79,7 +86,14 @@ class Vapid(object):
 
     def validate(self, token):
         """Sign a Valdiation token from the dashboard"""
-        return base64.urlsafe_b64encode(self.private_key.sign(token))
+        sig = self.private_key.sign(token, hashfunc=self._hasher)
+        token = base64.urlsafe_b64encode(sig)
+        return token
+
+    def verifyToken(self, sig, token):
+        hsig = base64.urlsafe_b64decode(sig)
+        return self.public_key.verify(hsig, token,
+                                      hashfunc=self._hasher)
 
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
