@@ -21,6 +21,9 @@ WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 -----END PUBLIC KEY-----
 """
 
+T_PUBLIC_RAW = """EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy\
+KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ=="""
+
 
 def setUp(self):
     ff = open('/tmp/private', 'w')
@@ -96,16 +99,14 @@ class VapidTestCase(unittest.TestCase):
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
             'id=previous,'
-            'p256ecdsa=EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy'
-            'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
+            'p256ecdsa=' + T_PUBLIC_RAW)
         items = jws.verify(result['Authorization'][7:],
                            v.public_key,
                            algorithms=["ES256"])
         eq_(json.loads(items), claims)
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
-            'p256ecdsa=EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy'
-            'KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==')
+            'p256ecdsa=' + T_PUBLIC_RAW)
 
     def test_bad_sign(self):
         v = Vapid("/tmp/private")

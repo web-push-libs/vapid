@@ -21,7 +21,7 @@ var vapid = {
     enus: {
         info: {
             OK_VAPID_KEYS: "VAPID Keys defined.",
-        }
+        },
         errs: {
             ERR_VAPID_KEY: "VAPID generate keys error: ",
             ERR_PUB_R_KEY: "Invalid Public Key record. Please use a valid RAW Formatted record.",
@@ -35,8 +35,6 @@ var vapid = {
             ERR_VERIFY: "Verify error",
         }
     },
-
-    lang: this.enus;
 
     _private_key:  "",
     _public_key: "",
@@ -59,23 +57,6 @@ var vapid = {
                });
     },
 
-    url_btoa: function(data) {
-        /* Convert a binary array into a URL safe base64 string */
-        if (data instanceof ArrayBuffer || data instanceof Uint8Array){
-            data = String.fromCharCode.apply(null, new Uint8Array(data))
-        }
-        let reply = btoa(data).replace(/\+/g, "-").replace(/\//g, "_");
-        return reply
-    },
-
-    url_atob: function(data) {
-        /* return a binary array from a URL safe base64 string */
-        let reply = this._str_to_array(atob(data
-                                       .replace(/\-/g, "+")
-                                       .replace(/\_/g, "/")));
-        return reply
-    },
-
     _str_to_array: function(str) {
         /* convert a string into a ByteArray
          *
@@ -88,6 +69,30 @@ var vapid = {
             reply[i] = String.charCodeAt(split[i]);
         }
         return reply;
+    },
+
+    _array_to_str: function(array) {
+        /* convert a ByteArray into a string
+         */
+        return String.fromCharCode.apply(null, new Uint8Array(array));
+    },
+
+    urlsafe: function(str) {
+        return str
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_");
+    },
+
+    url_btoa: function(data) {
+        /* Convert a binary array into a URL safe base64 string */
+        return this.urlsafe(btoa(this._array_to_str(data)));
+    },
+
+    url_atob: function(data) {
+        /* return a binary array from a URL safe base64 string */
+        return this._str_to_array(atob(data
+                                       .replace(/\-/g, "+")
+                                       .replace(/\_/g, "/")));
     },
 
     /* A fully featured DER library is available at
@@ -125,7 +130,7 @@ var vapid = {
                 // \x30 is a sequence start.
                 let seq = int1 + dvstr + curve_oid_const + vk_const;
                 let rder = "\x30" + chr(seq.length) + seq;
-                return this.url_btoa(rder);
+                return this.urlsafe(btoa(rder));
             })
             .catch(err => console.error(err))
     },
@@ -149,7 +154,7 @@ var vapid = {
                 let encPoint = "\x03" + chr(point.length) + point
                 let rder = "\x30" + chr(prefix.length + encPoint.length) +
                     prefix + encPoint;
-                let der = this.url_btoa(rder);
+                let der = this.urlsafe(btoa(rder));
                 return der;
             });
     },
@@ -187,6 +192,7 @@ var vapid = {
         };
 
         return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
+            .then(k => this._public_key = k)
     },
 
 
@@ -250,9 +256,9 @@ var vapid = {
             }
         })
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let headStr = JSON.stringify({typ:"JWT",alg:"ES256"});
-        let claimStr = JSON.stringify(claims);
-        let content = this.url_btoa(headStr) + "." + this.url_btoa(claimStr);
+        let headStr = btoa(JSON.stringify({typ:"JWT",alg:"ES256"}));
+        let claimStr = btoa(JSON.stringify(claims));
+        let content = headStr + "." + claimStr;
         let signatory = this._str_to_array(content);
         return webCrypto.sign(
             alg,
@@ -369,3 +375,5 @@ var vapid = {
            });
     }
 }
+
+vapid.lang = vapid.enus;
