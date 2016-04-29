@@ -42,7 +42,7 @@ setup(name="py-vapid",
       install_requires=REQS,
       entry_points="""
       [console_scripts]
-      vapid = vapid.main:main
+      vapid = py_vapid.main:main
       [nose.plugins]
       object-tracker = autopush.noseplugin:ObjectTracker
       """,
