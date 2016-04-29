@@ -183,8 +183,8 @@ var vapid = {
             ext: true,
             key_ops: ["verify"],
             kty: "EC",
-            x: x,
-            y, y
+            x: x.replace('=', ''),      // Current fashion, strip padding
+            y: y.replace('=', ''),
         };
 
         return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
