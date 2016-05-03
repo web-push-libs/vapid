@@ -11,35 +11,55 @@
 <div id="document-main">
 <h1>VAPID verification</h1>
 <div id="intro" class="section">
-    <p>This page helps construct or validate <a href="https://datatracker.ietf.org/doc/draft-thomson-webpush-vapid/">VAPID</a> header data.</p>
+    <p>This page helps validate or construct
+    <a href="https://datatracker.ietf.org/doc/draft-thomson-webpush-vapid/">VAPID</a>
+    header data. The <b><a href="#headers">Headers</a></b> section accepts existing header values
+    (e.g. ones created by a library or included as part of a subscription
+    update).</p>
+    <p>The <b><a href="#claims">Claims</a></b> section will create a valid JSON claim, generate a
+    VAPID key pair, and generate the proper header values.</p>
+    <p>The <b><a href="#export">Exported Keys</a></b> section provides the keys in DER format which
+    should be readable by many encryption libraries.</p>
 </div>
 <div id="inputs" class="section">
-<h2>Headers</h2>
-    <p>The headers are sent with subscription updates. They provide the site information to associate with
-    this feed.</p>
+    <a name="headers"><h2>Headers</h2></a>
+    <p>The headers are sent with subscription updates. They provide the
+    site information to associate with this feed. PLEASE NOTE: Your private
+    key should be generated on your machine and should NEVER leave your
+    box or control. This page will generate a valid key that can be used,
+    and all functions are local, but this is purely for educational purposes
+    only.</p>
     <label for="auth">Authorization Header:</label>
+    <div class="description">This is the content of the
+        <code>Authorization</code> header included as part of the subscription
+        POST update.</div>
     <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
     <label for="crypt">Crypto-Key Header:</label>
-    <p>The public key expressed after "p256ecdsa=" can associate this feed with the dashboard.</p>
+    <div class="description">This is your VAPID public key. This is included
+        as part of the <code>Crypto-Key</code> header, which is included
+        as part of the subscription POST update. <code>Crypto-Key</code>
+        may contain more than one part. Each part should be separated by a
+        comma (",")</div>
     <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
     <div class="control">
     <label for="publicKey">Public Key:</label>
-    <p>This is the public key you'd use for the Dashboard</p>
-    <textarea name="publicKey" placeholder="abCDef..." readonly=true></textarea>
+    <div class="description">This is the VAPID key you would use when adding
+        applications to your Dashboard.</div>
+    <div name="publicKey" class="value" ></div>
     <button id="check">Check headers</button>
 </div>
 </div>
 <div id="result" class="section">
-<h2>Claims</h2>
+    <a name="claims"><h2>Claims</h2></a>
     <p>Claims are the information a site uses to identify itself.
     <div class="row">
         <label for="aud" title="The full URL to your site."><b>Aud</b>ience:</label>
-        <p>The full URL to your site.</p>
+        <p>The optional full URL to your site.</p>
         <input name="aud" placeholder="https://push.example.com">
     </div>
     <div class="row">
     <label for="sub" ><b>Sub</b>scriber:</label>
-    <p>The administrative email address that can be contacted if there's an issue</p>
+    <p>The required administrative email address that can be contacted if there's an issue</p>
     <input name="sub" placeholder="mailto:admin@push.example.com">
     </div>
     <div class="row">
@@ -61,10 +81,11 @@
     </div>
 </div>
 <div id="keys" class="section">
-    <h2>Exported Keys</h2>
+    <a name="export"><h2>Exported Keys</h2></a>
 <b>Auto-generated keys:</b>
-<p>These are ASN.1 DER formatted version of the public and private keys used to generate
-the VAPID headers. These can be useful for languages that use DER or PEM for key import.</p>
+<p>These are ASN.1 DER formatted version of the public and private keys used
+to generate the above VAPID headers. These can be useful for languages that
+use DER or PEM for key import.</p>
     <label for="priv">DER Private Key:</label><textarea name="priv"></textarea>
     <label for="pub">DER Public Key:</label><textarea name="pub"></textarea>
 </div>
@@ -72,6 +93,8 @@ the VAPID headers. These can be useful for languages that use DER or PEM for key
 </div>
 </div>
 </main>
+<script src="der_lite.js"></script>
+<script src="common.js"></script>
 <script src="vapid.js"></script>
 <script>
 
@@ -207,12 +230,6 @@ function gen(){
          rclaims.innerHTML = JSON.stringify(claims, null, "    ");
          rclaims.classList.add("updated");
          vapid.generate_keys().then(x => {
-             vapid.export_private_der()
-                 .then(k => document.getElementsByName("priv")[0].value = k)
-                 .catch(er => error(er, "Private Key export failed"));
-            vapid.export_public_der()
-                 .then(k => document.getElementsByName("pub")[0].value = k)
-                .catch(er => error(er, "Public key export failed" ));
              vapid.sign(claims)
                 .then(k => {
                  let auth = document.getElementsByName("auth")[0];
@@ -223,10 +240,17 @@ function gen(){
                  crypt.classList.add('updated');
                  let pk = document.getElementsByName("publicKey")[0];
                  // Public Key is the crypto key minus the 'p256ecdsa='
-                 pk.value = k.publicKey;
+                 pk.innerHTML = k.publicKey;
                  pk.classList.add('updated');
                 })
                .catch(err => error(err, err_strs.enus.CLAIMS_FAIL));
+              exporter = new DERLite();
+              exporter.export_private_der(x.privateKey)
+                     .then(k => document.getElementsByName("priv")[0].value = k)
+                     .catch(er => error(er, "Private Key export failed"));
+              exporter.export_public_der(x.publicKey)
+                     .then(k => document.getElementsByName("pub")[0].value = k)
+                     .catch(er => error(er, "Public key export failed" ));
              });
      } catch (ex) {
          error(ex, err_strs.enus.HEADER_NOPE);
@@ -269,6 +293,8 @@ document.getElementById("check").addEventListener("click", check);
 document.getElementById("gen").addEventListener("click", gen);
 document.getElementById('vapid_exp').value = parseInt(Date.now()*.001) + 86400;
 
+var vapid = new VapidToken();
+var mzcc = new MozCommon();
 
 </script>
 </body>

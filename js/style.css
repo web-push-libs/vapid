@@ -1,17 +1,22 @@
 html {font-family:Arial;}
 .section {position:relative; padding: .5em;
       width:80%; margin:0 auto;}
+label{margin-top:.5em;}
 button{border:1px solid black; border-radius: 5pt; margin:5px; font-weight:bold}
 .section label {display:block;position:relative;right:0;}
-.section textarea {width:95%;white-space:pre-wrap;
+.section textarea, .section .value {
+      width:95%;white-space:pre-wrap;
       position:relative; left:3%;
+      min-height:4em;
       word-break:break-all;vertical-align:top;}
+.value {color: #666;}
+.description{margin: 0 3%;font-size:90%;}
 .hidden {display:none;}
 .section label {width:13em;}
 #err {color:red;}
 .err {color:red; border:1px solid red;}
 #raw_claims{white-space:pre-wrap;}
-input {
+input, .value {
       transition: background-color;
       border:1px solid #ccc;
 }
@@ -21,7 +26,6 @@ input {
 }
 .updated {
       background-color: auto;
-      border:1px solid #ccc;
       animation-duration: 1s;
       animation-name: update;
       animation-iteration-count: 2;
