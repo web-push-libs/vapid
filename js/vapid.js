@@ -1,6 +1,6 @@
 /* Javascript VAPID library.
  *
- * Requires: common.js :: mzcc
+ * Requires: common.js
  *
  */
 
@@ -14,9 +14,8 @@ try {
     var webCrypto = window.crypto.subtle;
 }
 
-
 class VapidToken {
-    constructor(aud, sub, exp, lang) {
+    constructor(aud, sub, exp, lang, mzcc) {
         /* Construct a base VAPID token.
          *
          * VAPID allows for self identification of a subscription update.
@@ -26,6 +25,11 @@ class VapidToken {
          * :param exp: Expiration - UTC expiration of this update. Defaults
          *      to now + 24 hours
          */
+
+        if (mzcc == undefined) {
+            mzcc = new MozCommon();
+        }
+        this.mzcc = mzcc;
         this._claims={};
         this._claims['aud'] = aud || "";
         if (sub !== undefined) {
@@ -88,9 +92,9 @@ class VapidToken {
          */
         return webCrypto.exportKey('jwk', this._public_key)
             .then( key => {
-                return mzcc.toUrlBase64("\x04" +
-                    mzcc.fromUrlBase64(key.x) +
-                    mzcc.fromUrlBase64(key.y))
+                return this.mzcc.toUrlBase64("\x04" +
+                    this.mzcc.fromUrlBase64(key.x) +
+                    this.mzcc.fromUrlBase64(key.y))
             })
             .catch(err => {
                 console.error("public raw format", err);
@@ -105,7 +109,7 @@ class VapidToken {
          * :returns: a promise from the imported key.
          */
         if (typeof(raw) == "string") {
-            raw = mzcc._strToArray(mzcc.fromUrlBase64(raw));
+            raw = this.mzcc.strToArray(this.mzcc.fromUrlBase64(raw));
         }
         let err = new Error(this.lang.errs.ERR_PUB_KEY);
 
@@ -115,9 +119,9 @@ class VapidToken {
         }
 
         raw= raw.slice(-64);
-        let x = mzcc.toUrlBase64(String.fromCharCode.apply(null,
+        let x = this.mzcc.toUrlBase64(String.fromCharCode.apply(null,
              raw.slice(0,32)));
-        let y = mzcc.toUrlBase64(String.fromCharCode.apply(null,
+        let y = this.mzcc.toUrlBase64(String.fromCharCode.apply(null,
              raw.slice(32,64)));
 
         // Convert to a JWK and import it.
@@ -139,7 +143,7 @@ class VapidToken {
     sign(claims) {
         /* Sign a claims object and return the headers that can be used to
          * decrypt the string.
-         *         *
+         *
          * :param claims: An object containing the VAPID claims.
          * :returns: a promise containing an object identifying the headers
          * and values to include to specify VAPID auth.
@@ -157,18 +161,19 @@ class VapidToken {
             throw new Error(this.lang.errs.ERR_CLAIM_MIS, "aud");
         }
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let headStr = mzcc.toUrlBase64(
+        let headStr = this.mzcc.toUrlBase64(
             JSON.stringify({typ:"JWT",alg:"ES256"}));
-        let claimStr = mzcc.toUrlBase64(
+        let claimStr = this.mzcc.toUrlBase64(
             JSON.stringify(claims));
         let content = headStr + "." + claimStr;
-        let signatory = mzcc._strToArray(content);
+        let signatory = this.mzcc.strToArray(content);
         return webCrypto.sign(
             alg,
             this._private_key,
             signatory)
             .then(signature => {
-                let sig = mzcc.toUrlBase64(mzcc._arrayToStr(signature));
+                let sig = this.mzcc.toUrlBase64(
+                    this.mzcc.arrayToStr(signature));
                 /* The headers consist of the constructed JWT as the
                  * "authorization" and the raw Public key as the p256ecdsa
                  * element of "Crypto-Key"
@@ -236,17 +241,18 @@ class VapidToken {
         let signature;
         let key;
         try {
-            signature = mzcc._strToArray(mzcc.fromUrlBase64(items[2]));
+            signature = this.mzcc.strToArray(
+                this.mzcc.fromUrlBase64(items[2]));
         } catch (err) {
             throw new Error(this.lang.errs.ERR_VERIFY_SG + err.message);
         }
         try {
-            key = mzcc._strToArray(mzcc.fromUrlBase64(items[1]));
+            key = this.mzcc.strToArray(this.mzcc.fromUrlBase64(items[1]));
         } catch (err) {
             throw new Error(this.lang.errs.ERR_VERIFY_KE + err.message);
         }
         let content = items.slice(0,2).join('.');
-        let signatory = mzcc._strToArray(content);
+        let signatory = this.mzcc.strToArray(content);
         return webCrypto.verify(
             alg,
             this._public_key,
@@ -257,7 +263,8 @@ class VapidToken {
                    return JSON.parse(
                         String.fromCharCode.apply(
                             null,
-                            mzcc._strToArray(mzcc.fromUrlBase64(items[1]))))
+                            this.mzcc.strToArray(
+                                this.mzcc.fromUrlBase64(items[1]))))
                }
                throw new Error(this.lang.errs.ERR_SIGNATURE);
            })
@@ -285,10 +292,10 @@ class VapidToken {
          * :returns: the signature value to paste back into the Dashboard.
          */
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let t2v = mzcc._strToArray(string);
+        let t2v = this.mzcc.strToArray(string);
         return webCrypto.sign(alg, this._private_key, t2v)
             .then(signed => {
-                let sig = mzcc.toUrlBase64(mzcc._arrayToStr(signed));
+                let sig = this.mzcc.toUrlBase64(this.mzcc.arrayToStr(signed));
                 return sig;
             });
     }
@@ -303,8 +310,8 @@ class VapidToken {
          * :returns: Boolean indicating successful verification.
          */
         let alg = {name: "ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
-        let vsig = mzcc._strToArray(mzcc.fromUrlBase64(sig));
-        let t2v = mzcc._strToArray(mzcc.fromUrlBase64(string));
+        let vsig = this.mzcc.strToArray(this.mzcc.fromUrlBase64(sig));
+        let t2v = this.mzcc.strToArray(this.mzcc.fromUrlBase64(string));
         return webCrypto.verify(alg, this._public_key, vsig, t2v);
     }
 }
