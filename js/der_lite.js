@@ -1,7 +1,12 @@
 'use strict';
 
 class DERLite{
-    constructor() {}
+    constructor(mzcc) {
+        if (mzcc === undefined) {
+            mzcc = new MozCommon();
+        }
+        this.mzcc = mzcc
+    }
 
     /* Simplified DER export and import is provided because a large number of
      * libraries and languages understand DER as a key exchange and storage
@@ -25,29 +30,29 @@ class DERLite{
         return webCrypto.exportKey("jwk", key)
             .then(k => {
                 // verifying key
-                let xv = mzcc.fromUrlBase64(k.x);
-                let yv = mzcc.fromUrlBase64(k.y);
+                let xv = this.mzcc.fromUrlBase64(k.x);
+                let yv = this.mzcc.fromUrlBase64(k.y);
                 // private key
-                let dv = mzcc.fromUrlBase64(k.d);
+                let dv = this.mzcc.fromUrlBase64(k.d);
 
                 // verifying key (public)
                 let vk = '\x00\x04' + xv + yv;
                 // \x02 is integer
                 let int1 = '\x02\x01\x01'; // integer 1
                 // \x04 is octet string
-                let dvstr = '\x04' + mzcc.chr(dv.length) + dv;
+                let dvstr = '\x04' + this.mzcc.chr(dv.length) + dv;
                 let curve_oid = "\x06\x08" +
                     "\x2a\x86\x48\xce\x3d\x03\x01\x07";
                 // \xaX is a construct, low byte is order.
-                let curve_oid_const = '\xa0' + mzcc.chr(curve_oid.length) +
+                let curve_oid_const = '\xa0' + this.mzcc.chr(curve_oid.length) +
                     curve_oid;
                 // \x03 is a bitstring
-                let vk_enc = '\x03' + mzcc.chr(vk.length) + vk;
-                let vk_const = '\xa1' + mzcc.chr(vk_enc.length) + vk_enc;
+                let vk_enc = '\x03' + this.mzcc.chr(vk.length) + vk;
+                let vk_const = '\xa1' + this.mzcc.chr(vk_enc.length) + vk_enc;
                 // \x30 is a sequence start.
                 let seq = int1 + dvstr + curve_oid_const + vk_const;
-                let rder = "\x30" + mzcc.chr(seq.length) + seq;
-                return mzcc.toUrlBase64(rder);
+                let rder = "\x30" + this.mzcc.chr(seq.length) + seq;
+                return this.mzcc.toUrlBase64(rder);
             })
             .catch(err => console.error(err))
     }
@@ -59,7 +64,7 @@ class DERLite{
          * :param der_str: URL safe base64 formatted DER string.
          * :returns: Promise containing the imported private key
          */
-        let der = mzcc._strToArray(mzcc.fromUrlBase64(der_str));
+        let der = this.mzcc.strToArray(this.mzcc.fromUrlBase64(der_str));
         // quick guantlet to see if this is a valid DER
         let cmp = new Uint8Array([2,1,1,4]);
         if (der[0] != 48 ||
@@ -77,9 +82,9 @@ class DERLite{
            ext: true,
            key_ops: key_ops,
            kty: "EC",
-           x: mzcc.toUrlBase64(String.fromCharCode.apply(null, xv)),
-           y: mzcc.toUrlBase64(String.fromCharCode.apply(null, yv)),
-           d: mzcc.toUrlBase64(String.fromCharCode.apply(null, dv)),
+           x: this.mzcc.toUrlBase64(String.fromCharCode.apply(null, xv)),
+           y: this.mzcc.toUrlBase64(String.fromCharCode.apply(null, yv)),
+           d: this.mzcc.toUrlBase64(String.fromCharCode.apply(null, dv)),
         };
 
         console.debug(JSON.stringify(jwk));
@@ -96,8 +101,8 @@ class DERLite{
         return webCrypto.exportKey("jwk", key)
             .then(k => {
                 // raw keys always begin with a 4
-                let xv = mzcc._strToArray(mzcc.fromUrlBase64(k.x));
-                let yv = mzcc._strToArray(mzcc.fromUrlBase64(k.y));
+                let xv = this.mzcc.strToArray(this.mzcc.fromUrlBase64(k.x));
+                let yv = this.mzcc.strToArray(this.mzcc.fromUrlBase64(k.y));
 
                 let point = "\x00\x04" +
                     String.fromCharCode.apply(null, xv) +
@@ -107,10 +112,10 @@ class DERLite{
                 let prefix = "\x30\x13" +  // sequence + length
                     "\x06\x07" + "\x2a\x86\x48\xce\x3d\x02\x01" +
                     "\x06\x08" + "\x2a\x86\x48\xce\x3d\x03\x01\x07"
-                let encPoint = "\x03" + mzcc.chr(point.length) + point
-                let rder = "\x30" + mzcc.chr(prefix.length + encPoint.length) +
+                let encPoint = "\x03" + this.mzcc.chr(point.length) + point
+                let rder = "\x30" + this.mzcc.chr(prefix.length + encPoint.length) +
                     prefix + encPoint;
-                let der = mzcc.toUrlBase64(rder);
+                let der = this.mzcc.toUrlBase64(rder);
                 return der;
             });
     }
@@ -128,7 +133,7 @@ class DERLite{
          *
          */
         if (typeof(derArray) == "string") {
-            derArray = mzcc._strToArray(mzcc.fromUrlBase64(derArray));
+            derArray = this.mzcc.strToArray(this.mzcc.fromUrlBase64(derArray));
         }
         /* Super light weight public key import function */
         let err = new Error(this.lang.errs.ERR_PUB_D_KEY);
@@ -143,9 +148,9 @@ class DERLite{
             throw err;
         }
         // pubkey offset starts at byte 25
-        let x = mzcc.toUrlBase64(String.fromCharCode
+        let x = this.mzcc.toUrlBase64(String.fromCharCode
                 .apply(null, derArray.slice(27, 27+32)));
-        let y = mzcc.toUrlBase64(String.fromCharCode
+        let y = this.mzcc.toUrlBase64(String.fromCharCode
                 .apply(null, derArray.slice(27+32, 27+64)));
 
         // Convert to a JWK and import it.
