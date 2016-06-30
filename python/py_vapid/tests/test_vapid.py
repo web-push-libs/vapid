@@ -115,8 +115,5 @@ class VapidTestCase(unittest.TestCase):
         v = Vapid("/tmp/private")
         self.assertRaises(VapidException,
                           v.sign,
-                          {'sub': "a@e.c"})
-        self.assertRaises(VapidException,
-                          v.sign,
-                          {'aud': "https://e.c"})
+                          {'aud': "p.example.com"})
 
