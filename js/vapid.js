@@ -20,8 +20,8 @@ class VapidToken {
          *
          * VAPID allows for self identification of a subscription update.
          *
-         * :param aud: Audience - email of the admin contact for this update.
-         * :param sub: Subscription - Optional site URL for this update.
+         * :param sub: Subscription - email of the admin contact for this
+         *      update.
          * :param exp: Expiration - UTC expiration of this update. Defaults
          *      to now + 24 hours
          */
@@ -157,8 +157,8 @@ class VapidToken {
         if (! claims.hasOwnProperty("exp")) {
             claims.exp = parseInt(Date.now()*.001) + 86400;
         }
-        if (! claims.hasOwnProperty("aud")) {
-            throw new Error(this.lang.errs.ERR_CLAIM_MIS, "aud");
+        if (! claims.hasOwnProperty("sub")) {
+            throw new Error(this.lang.errs.ERR_CLAIM_MIS, "sub");
         }
         let alg = {name:"ECDSA", namedCurve: "P-256", hash:{name:"SHA-256"}};
         let headStr = this.mzcc.toUrlBase64(
