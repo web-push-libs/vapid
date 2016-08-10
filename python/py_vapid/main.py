@@ -49,15 +49,20 @@ The claims file should be a JSON formatted file that holds the
 information that describes you. There are three elements in the claims
 file you'll need:
 
-    "aud" This is your site's URL (e.g. "https://example.com")
     "sub" This is your site's admin email address
           (e.g. "mailto:admin@example.com")
     "exp" This is the expiration time for the claim in seconds. If you don't
           have one, I'll add one that expires in 24 hours.
 
+You're also welcome to add additional fields to the claims which could be
+helpful for the Push Service operations team to pass along to your operations
+team (e.g. "ami-id": "e-123456", "cust-id": "a3sfa10987"). Remember to keep
+these values short to prevent some servers from rejecting the transaction due
+to overly large headers. See https://jwt.io/introduction/ for details.
+
 For example, a claims.json file could contain:
 
-{"aud": "https://example.com", "sub": "mailto:admin@example.com"}
+{"sub": "mailto:admin@example.com"}
 """
             exit
         try:
@@ -65,6 +70,7 @@ For example, a claims.json file could contain:
             result = vapid.sign(claims)
         except Exception, exc:
             print "Crap, something went wrong: %s", repr(exc)
+            raise exc
 
         print "Include the following headers in your request:\n"
         for key, value in result.items():
