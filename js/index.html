@@ -53,11 +53,6 @@
     <a name="claims"><h2>Claims</h2></a>
     <p>Claims are the information a site uses to identify itself.
     <div class="row">
-        <label for="aud" title="The full URL to your site."><b>Aud</b>ience:</label>
-        <p>The optional full URL to your site.</p>
-        <input name="aud" placeholder="https://push.example.com">
-    </div>
-    <div class="row">
     <label for="sub" ><b>Sub</b>scriber:</label>
     <p>The required administrative email address that can be contacted if there's an issue</p>
     <input name="sub" placeholder="mailto:admin@push.example.com">
@@ -67,6 +62,17 @@
     <p>Time in seconds for this claim to live. (Default/Max: 24 hours from now)</p>
     <input name="exp" id="vapid_exp" placeholder="Time in seconds">
     </div>
+    <p>&nbsp;</p>
+    <p><b><i>Note</i></b>: You can add more claims if you wish.
+    These can include things
+    like, the ID of the originating server (if you have several that may be
+    publishing updates), a proxied customer ID or hash (for privacy reasons,
+    you probably don't want to make this easily determinable), or any other
+    value that may be useful between the Push Server Ops team and yours.
+    Just make the values short so you don't run the risk of the server
+    rejecting a request because the headers are too big.</p>
+    <p>For example:
+    <code>{'ami_id':'e-1248296','cust_id':'a9afd519s919faio3'}</code></p>
     <div class="control">
     <button id="gen">Generate VAPID</button>
     </div>
@@ -124,7 +130,7 @@ function error(ex=null, msg=null, clear=false) {
 }
 
 function success(claims) {
-    for (let n of ["aud", "sub", "exp"]) {
+    for (let n of ["sub", "exp"]) {
         let item = document.getElementsByName(n)[0];
         item.value = claims[n];
         item.classList.add("updated");
@@ -171,15 +177,6 @@ function fetchClaims(){
         reply[item.name] = item.value;
     }
 
-    // verify aud
-    if (! /^https?:\/\//.test(reply['aud'])) {
-        error(null,
-            `Invalid Audience: Use the full URL of your site e.g. "http://example.com"`);
-        document.getElementsByName("aud")[0].classList.add("err");
-        err = true;
-    } else {
-        document.getElementsByName("aud")[0].classList.remove("err");
-    }
     // verify sub
     if (! /^mailto:.+@.+/.test(reply['sub'])) {
         error(null,
@@ -227,7 +224,9 @@ function gen(){
      }
      try {
          let rclaims = document.getElementById("raw_claims");
-         rclaims.innerHTML = JSON.stringify(claims, null, "    ");
+         let sc = JSON.stringify(claims, null, 4);
+         console.debug(sc);
+         rclaims.innerHTML = sc;
          rclaims.classList.add("updated");
          vapid.generate_keys().then(x => {
              vapid.sign(claims)

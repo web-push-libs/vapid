@@ -10,7 +10,7 @@ import ecdsa
 import logging
 from jose import jws
 
-__version__ = "0.2"
+__version__ = "0.3"
 
 
 class VapidException(Exception):

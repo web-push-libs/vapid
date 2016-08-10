@@ -1,4 +1,3 @@
 {
-    "aud": "https://catfacts.example.com",
     "sub": "mailto:webpush_ops@catfacts.example.com"
 }
