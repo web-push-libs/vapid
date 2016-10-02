@@ -68,16 +68,6 @@ class Vapid(object):
             self._public_key = self.private_key.get_verifying_key()
         return self._public_key
 
-    @property
-    def private_key_base64(self):
-        """Return the base64'ed private key."""
-        return base64.urlsafe_b64encode(self.private_key.to_string())
-
-    @property
-    def public_key_base64(self):
-        """Return the base64'ed public key."""
-        return base64.urlsafe_b64encode(self.public_key.to_string())
-
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
         self.private_key = ecdsa.SigningKey.generate(curve=ecdsa.NIST256p)
