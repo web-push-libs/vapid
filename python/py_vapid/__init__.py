@@ -2,13 +2,15 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import os
+import logging
 import base64
 import time
 import hashlib
 
 import ecdsa
-import logging
 from jose import jws
+
 
 class VapidException(Exception):
     """An exception wrapper for Vapid."""
@@ -24,6 +26,7 @@ class Vapid(object):
     def __init__(self, private_key_file=None, private_key=None):
         """Initialize VAPID using an optional file containing a private key
         in PEM format.
+
         :param private_key_file: The name of the file containing the
         private key
         """
@@ -116,7 +119,6 @@ class Vapid(object):
         :returns result: a hash containing the header fields to use in
             the subscription update.
         """
-        from jose import jws
         if not claims.get('exp'):
             claims['exp'] = int(time.time()) + 86400
         if not claims.get('sub'):
