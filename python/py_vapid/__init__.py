@@ -131,5 +131,5 @@ class Vapid(object):
         else:
             crypto_key = pkey
 
-        return {"Authorization": "Bearer " + sig.strip('='),
+        return {"Authorization": "WebPush " + sig.strip('='),
                 "Crypto-Key": crypto_key}
