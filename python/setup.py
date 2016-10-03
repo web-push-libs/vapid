@@ -3,7 +3,7 @@ import os
 
 from setuptools import setup, find_packages
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 
 def read_from(file):
@@ -29,9 +29,11 @@ setup(name="py-vapid",
       description='Simple VAPID header generation library',
       long_description=README + '\n\n' + CHANGES,
       classifiers=["Topic :: Internet :: WWW/HTTP",
-                   'Programming Language :: Python',
+                   "Programming Language :: Python",
                    "Programming Language :: Python :: 2",
-                   "Programming Language :: Python :: 2.7"
+                   "Programming Language :: Python :: 2.7",
+                   "Programming Language :: Python :: 3",
+                   "Programming Language :: Python :: 3.4",
                    ],
       keywords='vapid push webpush',
       author="JR Conlin",
