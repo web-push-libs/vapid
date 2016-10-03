@@ -9,12 +9,13 @@ from mock import patch
 from jose import jws
 from py_vapid import Vapid, VapidException
 
-T_PRIVATE = """-----BEGIN EC PRIVATE KEY-----
+T_DER = """
 MHcCAQEEIPeN1iAipHbt8+/KZ2NIF8NeN24jqAmnMLFZEMocY8RboAoGCCqGSM49
 AwEHoUQDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hbWAUpQFKDByKB81yldJ9GTklB
 M5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
------END EC PRIVATE KEY-----
 """
+T_PRIVATE = ("-----BEGIN EC PRIVATE KEY-----{}"
+             "-----END EC PRIVATE KEY-----\n").format(T_DER)
 
 T_PUBLIC = """-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hb
@@ -48,6 +49,13 @@ class VapidTestCase(unittest.TestCase):
         v2 = Vapid(private_key=T_PRIVATE)
         eq_(v2.private_key.to_pem(), T_PRIVATE)
         eq_(v2.public_key.to_pem(), T_PUBLIC)
+        v3 = Vapid(private_key=T_DER)
+        eq_(v3.private_key.to_pem(), T_PRIVATE)
+        eq_(v3.public_key.to_pem(), T_PUBLIC)
+        no_exist = '/tmp/not_exist'
+        Vapid(private_key_file=no_exist)
+        ok_(os.path.isfile(no_exist))
+        os.unlink(no_exist)
 
     @patch("ecdsa.SigningKey.from_pem", side_effect=Exception)
     def test_init_bad_priv(self, mm):
@@ -57,19 +65,12 @@ class VapidTestCase(unittest.TestCase):
 
     def test_private(self):
         v = Vapid()
-
-        def getKey(v):
-            v.private_key
-
-        self.assertRaises(VapidException, getKey, v)
+        self.assertRaises(VapidException, lambda x=None: v.private_key)
 
     def test_public(self):
         v = Vapid()
 
-        def getKey(v):
-            v.public_key
-
-        self.assertRaises(VapidException, getKey, v)
+        self.assertRaises(VapidException, lambda x=None: v.public_key)
 
     def test_gen_key(self):
         v = Vapid()
@@ -95,6 +96,8 @@ class VapidTestCase(unittest.TestCase):
         ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken),
                                 msg,
                                 hashfunc=hashlib.sha256))
+        # test verify
+        ok_(v.verify_token(msg, vtoken))
 
     def test_sign(self):
         v = Vapid("/tmp/private")
@@ -103,7 +106,7 @@ class VapidTestCase(unittest.TestCase):
         eq_(result['Crypto-Key'],
             'id=previous,'
             'p256ecdsa=' + T_PUBLIC_RAW)
-        items = jws.verify(result['Authorization'][7:],
+        items = jws.verify(result['Authorization'].split(' ')[1],
                            v.public_key,
                            algorithms=["ES256"])
         eq_(json.loads(items), claims)
@@ -116,4 +119,3 @@ class VapidTestCase(unittest.TestCase):
         self.assertRaises(VapidException,
                           v.sign,
                           {'aud': "p.example.com"})
-

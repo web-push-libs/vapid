@@ -1,0 +1,12 @@
+language: python
+python:
+- "2.7"
+install:
+- cd python
+- pip install -r requirements.txt
+- pip install -r test-requirements.txt
+script:
+- nosetests
+- flake8 pywebpush
+after_success:
+    - coverage report --omit py_vapid/main.py
