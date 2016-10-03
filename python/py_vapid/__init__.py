@@ -25,10 +25,13 @@ class Vapid(object):
 
     def __init__(self, private_key_file=None, private_key=None):
         """Initialize VAPID using an optional file containing a private key
-        in PEM format.
+        in PEM format, or a string containing the PEM formatted private key.
 
-        :param private_key_file: The name of the file containing the
-        private key
+        :param private_key_file: Name of the file containing the private key
+        :type private_key_file: str
+        :param private_key: A private key in PEM format
+        :type private_key: str
+
         """
         if private_key_file:
             if not os.path.isfile(private_key_file):
@@ -50,7 +53,7 @@ class Vapid(object):
 
     @property
     def private_key(self):
-        """Return the private key."""
+        """The VAPID private ECDSA key"""
         if not self._private_key:
             raise VapidException(
                 "No private key defined. Please import or generate a key.")
@@ -58,12 +61,22 @@ class Vapid(object):
 
     @private_key.setter
     def private_key(self, value):
-        """Set the private key."""
+        """Set the VAPID private ECDSA key
+
+        :param value: the byte array containing the private ECDSA key data
+        :type value: bytes
+
+        """
         self._private_key = value
 
     @property
     def public_key(self):
-        """Return the public key."""
+        """The VAPID public ECDSA key
+
+        The public key is currently read only. Set it via the `.private_key`
+        method.
+
+        """
         if not self._public_key:
             self._public_key = self.private_key.get_verifying_key()
         return self._public_key
@@ -71,10 +84,15 @@ class Vapid(object):
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
         self.private_key = ecdsa.SigningKey.generate(curve=ecdsa.NIST256p)
-        self.public_key
+        self._public_key = self.private_key.get_verifying_key()
 
     def save_key(self, key_file):
-        """Save the private key to a PEM file."""
+        """Save the private key to a PEM file.
+
+        :param key_file: The file path to save the private key data
+        :type key_file: str
+
+        """
         file = open(key_file, "wb")
         if not self._private_key:
             self.generate_keys()
@@ -84,30 +102,52 @@ class Vapid(object):
     def save_public_key(self, key_file):
         """Save the public key to a PEM file.
         :param key_file: The name of the file to save the public key
+        :type key_file: str
+
         """
         with open(key_file, "wb") as file:
             file.write(self.public_key.to_pem())
             file.close()
 
-    def validate(self, token):
-        """Sign a Valdiation token from the dashboard"""
-        sig = self.private_key.sign(token, hashfunc=self._hasher)
-        token = base64.urlsafe_b64encode(sig)
-        return token
+    def validate(self, validation_token):
+        """Sign a Valdiation token from the dashboard
 
-    def verify_token(self, sig, token):
-        """Verify the signature against the token."""
-        hsig = base64.urlsafe_b64decode(sig)
-        return self.public_key.verify(hsig, token,
+        :param validation_token: Short validation token from the dev dashboard
+        :type validation_token: str
+        :returns: corresponding token for key verification
+        :rtype: str
+
+        """
+        sig = self.private_key.sign(validation_token, hashfunc=self._hasher)
+        verification_token = base64.urlsafe_b64encode(sig)
+        return verification_token
+
+    def verify_token(self, validation_token, verification_token):
+        """Internally used to verify the verification token is correct.
+
+        :param validation_token: Provided validation token string
+        :type validation_token: str
+        :param verification_token: Generated verification token
+        :type verification_token: str
+        :returns: Boolean indicating if verifictation token is valid.
+        :rtype: boolean
+
+        """
+        hsig = base64.urlsafe_b64decode(verification_token)
+        return self.public_key.verify(hsig, validation_token,
                                       hashfunc=self._hasher)
 
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
         :param claims: JSON object containing the JWT claims to use.
+        :type claims: dict
         :param crypto_key: Optional existing crypto_key header content. The
             vapid public key will be appended to this data.
-        :returns result: a hash containing the header fields to use in
+        :type crypto_key: str
+        :returns: a hash containing the header fields to use in
             the subscription update.
+        :rtype: dict
+
         """
         if not claims.get('exp'):
             claims['exp'] = int(time.time()) + 86400
