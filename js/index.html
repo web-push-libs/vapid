@@ -22,6 +22,10 @@
     should be readable by many encryption libraries.</p>
 </div>
 <div id="inputs" class="section">
+    <div id="version">
+        <label for="version"><input type="radio" name="version" value="1" checked>VAPID Draft spec-01</label>
+        <label for="version"><input type="radio" name="version" value="2">VAPID Draft spec-02</label>
+    </div>
     <a name="headers"><h2>Headers</h2></a>
     <p>The headers are sent with subscription updates. They provide the
     site information to associate with this feed. PLEASE NOTE: Your private
@@ -35,11 +39,11 @@
         POST update.</div>
     <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
     <label for="crypt">Crypto-Key Header:</label>
-    <div class="description">This is your VAPID public key. This is included
+    <div class="description">This is included
         as part of the <code>Crypto-Key</code> header, which is included
         as part of the subscription POST update. <code>Crypto-Key</code>
         may contain more than one part. Each part should be separated by a
-        comma (",")</div>
+        comma (",") (NOTE: For Draft-02, this header is not required)</div>
     <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
     <div class="control">
     <label for="publicKey">Public Key:</label>
@@ -114,6 +118,13 @@ let err_strs = {
         BAD_CRYP_HE: "Missing Crypto-Key Header",
         BAD_HEADERS: "Header check failed",
     }
+}
+
+function vapid_version() {
+  if (document.getElementById('version').getElementsByTagName('input')[0].checked) {
+    return new VapidToken01();
+  }
+  return new VapidToken02();
 }
 
 function error(ex=null, msg=null, clear=false) {
@@ -215,6 +226,7 @@ function fetchClaims(){
 
 function gen(){
     // clear the headers
+    let vapidToken = vapid_version();
     for (h of document.getElementById("inputs").getElementsByTagName("textarea")) {
         h.value = "";
         h.classList.remove("updated");
@@ -229,15 +241,17 @@ function gen(){
          console.debug(sc);
          rclaims.innerHTML = sc;
          rclaims.classList.add("updated");
-         vapid.generate_keys().then(x => {
-             vapid.sign(claims)
+         vapidToken.generate_keys().then(x => {
+             vapidToken.sign(claims)
                 .then(k => {
                  let auth = document.getElementsByName("auth")[0];
                  auth.value = k.authorization;
                  auth.classList.add('updated');
                  let crypt = document.getElementsByName("crypt")[0];
-                 crypt.value = k["crypto-key"];
-                 crypt.classList.add('updated');
+                 if (k["crypto-key"]) {
+                   crypt.value = k["crypto-key"];
+                   crypt.classList.add('updated');
+                 }
                  let pk = document.getElementsByName("publicKey")[0];
                  // Public Key is the crypto key minus the 'p256ecdsa='
                  pk.innerHTML = k.publicKey;
@@ -258,6 +272,7 @@ function gen(){
 }
 
 function check(){
+  let vapidToken = vapid_version();
     try {
         // clear claims
         for (let item of document
@@ -274,14 +289,14 @@ function check(){
         let token = fetchAuth();
         let public_key = fetchCrypt();
         if ((token == null) && (pubic_key == null)) {
-            if (token == null){
-                error(null, err_strs.enus.BAD_AUTH_HE);
-                return
-            }
-            failure(null, err_strs.enus.BAD_CRYP_HE);
+          if (token == null) {
+            error(null, err_strs.enus.BAD_AUTH_HE);
             return
+          }
+          failure(null, err_strs.enus.BAD_CRYP_HE);
+          return
         }
-        vapid.verify(token, public_key)
+        vapidToken.verify(token, public_key)
             .then(k => success(k))
             .catch(err => error(err, err_strs.enus.BAD_HEADERS));
     } catch (e) {
@@ -293,8 +308,6 @@ document.getElementById("check").addEventListener("click", check);
 document.getElementById("gen").addEventListener("click", gen);
 document.getElementById('vapid_exp').value = parseInt(Date.now()*.001) + 86400;
 
-var vapid = new VapidToken();
-var mzcc = new MozCommon();
 
 </script>
 </body>

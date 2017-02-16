@@ -14,7 +14,7 @@ try {
     var webCrypto = window.crypto.subtle;
 }
 
-class VapidToken {
+class VapidCore {
     constructor(aud, sub, exp, lang, mzcc) {
         /* Construct a base VAPID token.
          *
@@ -131,16 +131,14 @@ class VapidToken {
             key_ops: ["verify"],
             kty: "EC",
             x: x,
-            y, y
+            y: y,
         };
 
         return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
             .then(k => this._public_key = k)
     }
 
-
-
-    sign(claims) {
+    _sign(claims) {
         /* Sign a claims object and return the headers that can be used to
          * decrypt the string.
          *
@@ -186,9 +184,8 @@ class VapidToken {
                 return this.export_public_raw()
                     .then( pubKey => {
                         return {
-                            authorization: "WebPush " + content + "." + sig,
-                            "crypto-key": "p256ecdsa=" + pubKey,
-                            publicKey: pubKey,
+                            jwt: content + "." + sig,
+                            pubkey: pubKey,
                         }
                     })
             })
@@ -197,7 +194,7 @@ class VapidToken {
             })
     }
 
-    verify(token, public_key=null) {
+    _verify(token) {
         /* Verify a VAPID token.
          *
          * Token is the Authorization Header, Public Key is the Crypto-Key
@@ -207,33 +204,8 @@ class VapidToken {
          */
 
         // Ideally, just the bearer token, Cheat a little to be nice to the dev.
-        scheme = token.toLowerCase().split(" ")[0]
-        if (scheme == "bearer" || scheme == "webpush") {
-            token = token.split(" ")[1];
-        }
-
-        // Again, ideally, just the p256ecdsa token.
-        if (public_key != null) {
-
-            if (public_key.search('p256ecdsa') > -1) {
-                let sc = /p256ecdsa=([^;,]+)/i;
-                public_key = sc.exec(public_key)[1];
-            }
-
-            // If there's no public key already defined, load the public_key
-            // and try again.
-            return this.import_public_raw(public_key)
-                .then(key => {
-                    this._public_key = key;
-                    return this.verify(token);
-                })
-                .catch(err => {
-                    console.error("Verify error", err);
-                    throw err;
-                });
-        }
         if (this._public_key == "") {
-            throw new Error(this.lang.errs.ERR_NO_KEYS);
+          throw new Error(this.lang.errs.ERR_NO_KEYS);
         }
 
         let alg = {name: "ECDSA", namedCurve: "P-256",
@@ -314,5 +286,91 @@ class VapidToken {
         let vsig = this.mzcc.strToArray(this.mzcc.fromUrlBase64(sig));
         let t2v = this.mzcc.strToArray(this.mzcc.fromUrlBase64(string));
         return webCrypto.verify(alg, this._public_key, vsig, t2v);
+    }
+}
+
+class VapidToken01 extends VapidCore {
+
+    sign(claims) {
+        return this._sign(claims)
+          .then(elements=> {
+              return {
+                  authorization: "WebPush " + elements.jwt,
+                  "crypto-key": "p256ecdsa=" + elements.pubkey,
+                  publicKey: elements.pubkey,
+              }
+            }
+          )
+    }
+
+    verify(token, public_key) {
+      let scheme = token.toLowerCase().split(" ")[0]
+      if (scheme == "bearer" || scheme == "webpush") {
+        token = token.split(" ")[1];
+      }
+
+      // Again, ideally, just the p256ecdsa token.
+      if (public_key != null) {
+
+        if (public_key.search('p256ecdsa') > -1) {
+          let sc = /p256ecdsa=([^;,]+)/i;
+          public_key = sc.exec(public_key)[1];
+        }
+
+        // If there's no public key already defined, load the public_key
+        // and try again.
+        return this.import_public_raw(public_key)
+          .then(key => {
+            this._public_key = key;
+            return this._verify(token);
+          })
+          .catch(err => {
+            console.error("Verify error", err);
+            throw err;
+          });
+      }
+
+      return this._verify(token)
+    }
+}
+
+class VapidToken02 extends VapidCore {
+
+    sign(claims) {
+        return this._sign(claims)
+          .then(elements=> {
+              return {
+                  authorization: "vapid t=" + elements.jwt + ",k=" + elements.pubkey,
+                  publicKey: elements.pubkey,
+              }
+            }
+          )
+    }
+
+    verify(token) {
+      let scheme = token.toLowerCase().split(" ")[0]
+      if (scheme == "vapid") {
+        token = token.split(" ")[1];
+      }
+      let vals = {};
+      let elements = token.split(",");
+      for (let element of elements) {
+          let label = element.slice(0,2);
+          if (label == "t=") {
+              vals.t = element.slice(2);
+          }
+          if (label == "k=") {
+              vals.k = element.slice(2);
+          }
+      }
+      return this.import_public_raw(vals.k)
+        .then(key => {
+          this._public_key = key;
+          return this._verify(vals.t);
+        })
+        .catch(err => {
+          console.error("Verify error", err);
+          throw err;
+        });
     }
 }
