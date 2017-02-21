@@ -11,17 +11,25 @@ import hashlib
 import ecdsa
 from jose import jws
 
+# Show compliance version. For earlier versions see previously tagged releases.
+VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
+
 
 class VapidException(Exception):
     """An exception wrapper for Vapid."""
     pass
 
 
-class Vapid(object):
-    """Minimal VAPID signature generation library. """
+class Vapid01(object):
+    """Minimal VAPID Draft 01 signature generation library.
+
+    https://tools.ietf.org/html/draft-ietf-webpush-vapid-01
+
+    """
     _private_key = None
     _public_key = None
     _hasher = hashlib.sha256
+    _schema = "WebPush"
 
     def __init__(self, private_key_file=None, private_key=None):
         """Initialize VAPID using an optional file containing a private key
@@ -137,6 +145,15 @@ class Vapid(object):
         return self.public_key.verify(hsig, validation_token,
                                       hashfunc=self._hasher)
 
+    def _base_sign(self, claims):
+        if not claims.get('exp'):
+            claims['exp'] = int(time.time()) + 86400
+        if not claims.get('sub'):
+            raise VapidException(
+                "Missing 'sub' from claims. "
+                "'sub' is your admin email as a mailto: link.")
+        return claims
+
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
         :param claims: JSON object containing the JWT claims to use.
@@ -149,12 +166,7 @@ class Vapid(object):
         :rtype: dict
 
         """
-        if not claims.get('exp'):
-            claims['exp'] = int(time.time()) + 86400
-        if not claims.get('sub'):
-            raise VapidException(
-                "Missing 'sub' from claims. "
-                "'sub' is your admin email as a mailto: link.")
+        claims = self._base_sign(claims)
         sig = jws.sign(claims, self.private_key, algorithm="ES256")
         pkey = 'p256ecdsa='
         pkey += base64.urlsafe_b64encode(self.public_key.to_string())
@@ -163,5 +175,32 @@ class Vapid(object):
         else:
             crypto_key = pkey
 
-        return {"Authorization": "WebPush " + sig.strip('='),
+        return {"Authorization": "{} {}".format(self._schema, sig.strip('=')),
                 "Crypto-Key": crypto_key}
+
+
+class Vapid02(Vapid01):
+    """Minimal Vapid 02 signature generation library
+
+    https://tools.ietf.org/html/draft-ietf-webpush-vapid-02
+
+    """
+    _schema = "vapid"
+
+    def sign(self, claims, crypto_key=None):
+        claims = self._base_sign(claims)
+        sig = jws.sign(claims, self.private_key, algorithm="ES256")
+        pkey = self.public_key.to_string()
+        # Make sure that the key is properly prefixed.
+        if len(pkey) == 64:
+            pkey = '\04' + pkey
+        return{
+            "Authorization": "{schema} t={t},k={k}".format(
+                schema=self._schema,
+                t=sig,
+                k=base64.urlsafe_b64encode(pkey).strip('=')
+            )
+        }
+
+
+Vapid = Vapid01

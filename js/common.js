@@ -27,7 +27,7 @@ class MozCommon {
     fromUrlBase64(data) {
         /* return a binary array from a URL safe base64 string
         */
-        return atob((data + "====".substr(data.length % 4))
+        return atob(data
             .replace(/\-/g, "+")
             .replace(/\_/g, "/"));
     }

@@ -6,14 +6,21 @@ import argparse
 import os
 import json
 
-from py_vapid import Vapid
+from py_vapid import Vapid01, Vapid02
 
 
 def main():
     parser = argparse.ArgumentParser(description="VAPID tool")
     parser.add_argument('--sign', '-s', help='claims file to sign')
     parser.add_argument('--validate', '-v', help='dashboard token to validate')
+    parser.add_argument('--version2', '-2', help="use VAPID spec Draft-02",
+                        default=False, action="store_true")
+    parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
+                        default=True, action="store_true")
     args = parser.parse_args()
+    Vapid = Vapid01
+    if args.version2:
+        Vapid = Vapid02
     if not os.path.exists('private_key.pem'):
         print "No private_key.pem file found."
         answer = None

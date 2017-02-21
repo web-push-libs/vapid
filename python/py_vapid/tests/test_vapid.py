@@ -7,7 +7,7 @@ from nose.tools import eq_, ok_
 from mock import patch
 
 from jose import jws
-from py_vapid import Vapid, VapidException
+from py_vapid import Vapid01, Vapid02, VapidException
 
 T_DER = """
 MHcCAQEEIPeN1iAipHbt8+/KZ2NIF8NeN24jqAmnMLFZEMocY8RboAoGCCqGSM49
@@ -43,54 +43,57 @@ def tearDown(self):
 
 class VapidTestCase(unittest.TestCase):
     def test_init(self):
-        v1 = Vapid(private_key_file="/tmp/private")
+        v1 = Vapid01(private_key_file="/tmp/private")
         eq_(v1.private_key.to_pem(), T_PRIVATE)
         eq_(v1.public_key.to_pem(), T_PUBLIC)
-        v2 = Vapid(private_key=T_PRIVATE)
+        v2 = Vapid01(private_key=T_PRIVATE)
         eq_(v2.private_key.to_pem(), T_PRIVATE)
         eq_(v2.public_key.to_pem(), T_PUBLIC)
-        v3 = Vapid(private_key=T_DER)
+        v3 = Vapid01(private_key=T_DER)
         eq_(v3.private_key.to_pem(), T_PRIVATE)
         eq_(v3.public_key.to_pem(), T_PUBLIC)
         no_exist = '/tmp/not_exist'
-        Vapid(private_key_file=no_exist)
+        Vapid01(private_key_file=no_exist)
         ok_(os.path.isfile(no_exist))
         os.unlink(no_exist)
+
+    def repad(self, data):
+        return data + b"===="[:len(data) % 4]
 
     @patch("ecdsa.SigningKey.from_pem", side_effect=Exception)
     def test_init_bad_priv(self, mm):
         self.assertRaises(Exception,
-                          Vapid,
+                          Vapid01,
                           private_key_file="/tmp/private")
 
     def test_private(self):
-        v = Vapid()
+        v = Vapid01()
         self.assertRaises(VapidException, lambda x=None: v.private_key)
 
     def test_public(self):
-        v = Vapid()
+        v = Vapid01()
 
         self.assertRaises(VapidException, lambda x=None: v.public_key)
 
     def test_gen_key(self):
-        v = Vapid()
+        v = Vapid01()
         v.generate_keys()
         ok_(v.public_key)
         ok_(v.private_key)
 
     def test_save_key(self):
-        v = Vapid()
+        v = Vapid01()
         v.save_key("/tmp/p2")
         os.unlink("/tmp/p2")
 
     def test_save_public_key(self):
-        v = Vapid()
+        v = Vapid01()
         v.generate_keys()
         v.save_public_key("/tmp/p2")
         os.unlink("/tmp/p2")
 
     def test_validate(self):
-        v = Vapid("/tmp/private")
+        v = Vapid01("/tmp/private")
         msg = "foobar"
         vtoken = v.validate(msg)
         ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken),
@@ -99,8 +102,8 @@ class VapidTestCase(unittest.TestCase):
         # test verify
         ok_(v.verify_token(msg, vtoken))
 
-    def test_sign(self):
-        v = Vapid("/tmp/private")
+    def test_sign_01(self):
+        v = Vapid01("/tmp/private")
         claims = {"aud": "example.com", "sub": "admin@example.com"}
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
@@ -114,8 +117,29 @@ class VapidTestCase(unittest.TestCase):
         eq_(result['Crypto-Key'],
             'p256ecdsa=' + T_PUBLIC_RAW)
 
+    def test_sign_02(self):
+        v = Vapid02("/tmp/private")
+        claims = {"aud": "example.com",
+                  "sub": "admin@example.com",
+                  "foo": "extra value"}
+        result = v.sign(claims, "id=previous")
+        auth = result['Authorization']
+        eq_(auth[:6], 'vapid ')
+        ok_(' t=' in auth)
+        ok_(',k=' in auth)
+        parts = auth[6:].split(',')
+        eq_(len(parts), 2)
+        t_val = json.loads(base64.urlsafe_b64decode(
+            self.repad(parts[0][2:].split('.')[1])
+        ))
+        k_val = base64.urlsafe_b64decode(self.repad(parts[1][2:]))
+        eq_(k_val[0], "\04")
+        eq_(len(k_val), 65)
+        for k in claims:
+            eq_(t_val[k], claims[k])
+
     def test_bad_sign(self):
-        v = Vapid("/tmp/private")
+        v = Vapid01("/tmp/private")
         self.assertRaises(VapidException,
                           v.sign,
                           {'aud': "p.example.com"})
