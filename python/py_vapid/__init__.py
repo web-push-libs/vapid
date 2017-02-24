@@ -4,6 +4,7 @@
 
 import os
 import logging
+import binascii
 import base64
 import time
 import hashlib
@@ -126,7 +127,8 @@ class Vapid01(object):
         :rtype: str
 
         """
-        sig = self.private_key.sign(validation_token, hashfunc=self._hasher)
+        sig = self.private_key.sign(validation_token,
+            hashfunc=self._hasher)
         verification_token = base64.urlsafe_b64encode(sig)
         return verification_token
 
@@ -154,6 +156,11 @@ class Vapid01(object):
                 "'sub' is your admin email as a mailto: link.")
         return claims
 
+    def encode(self, bstring):
+        return binascii.b2a_base64(
+            bstring).decode('utf8').replace('\n', '').replace(
+            '+', '-').replace('/', '_').replace('=', '')
+
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
         :param claims: JSON object containing the JWT claims to use.
@@ -169,7 +176,7 @@ class Vapid01(object):
         claims = self._base_sign(claims)
         sig = jws.sign(claims, self.private_key, algorithm="ES256")
         pkey = 'p256ecdsa='
-        pkey += base64.urlsafe_b64encode(self.public_key.to_string())
+        pkey += self.encode(self.public_key.to_string())
         if crypto_key:
             crypto_key = crypto_key + ',' + pkey
         else:
@@ -193,12 +200,12 @@ class Vapid02(Vapid01):
         pkey = self.public_key.to_string()
         # Make sure that the key is properly prefixed.
         if len(pkey) == 64:
-            pkey = '\04' + pkey
+            pkey = b'\04' + pkey
         return{
             "Authorization": "{schema} t={t},k={k}".format(
                 schema=self._schema,
                 t=sig,
-                k=base64.urlsafe_b64encode(pkey).strip('=')
+                k=self.encode(pkey)
             )
         }
 
