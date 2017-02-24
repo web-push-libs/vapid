@@ -1,3 +1,4 @@
+import binascii
 import base64
 import hashlib
 import os
@@ -24,7 +25,7 @@ WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 """
 
 T_PUBLIC_RAW = """EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy\
-KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ=="""
+KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==""".strip('=')
 
 
 def setUp(self):
@@ -44,21 +45,21 @@ def tearDown(self):
 class VapidTestCase(unittest.TestCase):
     def test_init(self):
         v1 = Vapid01(private_key_file="/tmp/private")
-        eq_(v1.private_key.to_pem(), T_PRIVATE)
-        eq_(v1.public_key.to_pem(), T_PUBLIC)
+        eq_(v1.private_key.to_pem(), T_PRIVATE.encode('utf8'))
+        eq_(v1.public_key.to_pem(), T_PUBLIC.encode('utf8'))
         v2 = Vapid01(private_key=T_PRIVATE)
-        eq_(v2.private_key.to_pem(), T_PRIVATE)
-        eq_(v2.public_key.to_pem(), T_PUBLIC)
+        eq_(v2.private_key.to_pem(), T_PRIVATE.encode('utf8'))
+        eq_(v2.public_key.to_pem(), T_PUBLIC.encode('utf8'))
         v3 = Vapid01(private_key=T_DER)
-        eq_(v3.private_key.to_pem(), T_PRIVATE)
-        eq_(v3.public_key.to_pem(), T_PUBLIC)
+        eq_(v3.private_key.to_pem(), T_PRIVATE.encode('utf8'))
+        eq_(v3.public_key.to_pem(), T_PUBLIC.encode('utf8'))
         no_exist = '/tmp/not_exist'
         Vapid01(private_key_file=no_exist)
         ok_(os.path.isfile(no_exist))
         os.unlink(no_exist)
 
     def repad(self, data):
-        return data + b"===="[:len(data) % 4]
+        return data + "===="[:len(data) % 4]
 
     @patch("ecdsa.SigningKey.from_pem", side_effect=Exception)
     def test_init_bad_priv(self, mm):
@@ -94,7 +95,7 @@ class VapidTestCase(unittest.TestCase):
 
     def test_validate(self):
         v = Vapid01("/tmp/private")
-        msg = "foobar"
+        msg = "foobar".encode('utf8')
         vtoken = v.validate(msg)
         ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken),
                                 msg,
@@ -112,7 +113,7 @@ class VapidTestCase(unittest.TestCase):
         items = jws.verify(result['Authorization'].split(' ')[1],
                            v.public_key,
                            algorithms=["ES256"])
-        eq_(json.loads(items), claims)
+        eq_(json.loads(items.decode('utf8')), claims)
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
             'p256ecdsa=' + T_PUBLIC_RAW)
@@ -131,9 +132,9 @@ class VapidTestCase(unittest.TestCase):
         eq_(len(parts), 2)
         t_val = json.loads(base64.urlsafe_b64decode(
             self.repad(parts[0][2:].split('.')[1])
-        ))
-        k_val = base64.urlsafe_b64decode(self.repad(parts[1][2:]))
-        eq_(k_val[0], "\04")
+        ).decode('utf8'))
+        k_val = binascii.a2b_base64(self.repad(parts[1][2:]))
+        eq_(binascii.hexlify(k_val)[:2], b'04')
         eq_(len(k_val), 65)
         for k in claims:
             eq_(t_val[k], claims[k])
