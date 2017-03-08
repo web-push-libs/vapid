@@ -24,8 +24,12 @@ WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 -----END PUBLIC KEY-----
 """
 
-T_PUBLIC_RAW = """EJwJZq_GN8jJbo1GGpyU70hmP2hbWAUpQFKDBy\
-KB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx-gsQRQ==""".strip('=')
+# this is a DER RAW key ('\x04' + 2 32 octet digits)
+# Remember, this should have any padding stripped.
+T_PUBLIC_RAW = (
+    "BBCcCWavxjfIyW6NRhqclO9IZj9oW1gFKUBSgwcigfNc"
+    "pXSfRk5JQTOcahMLjzO1bkHMoiw4b6L7YTyF8foLEEU"
+    ).strip('=')
 
 
 def setUp(self):
@@ -87,7 +91,7 @@ class VapidTestCase(unittest.TestCase):
         v.save_key("/tmp/p2")
         os.unlink("/tmp/p2")
 
-    def test_save_public_key(self):
+    def test_same_public_key(self):
         v = Vapid01()
         v.generate_keys()
         v.save_public_key("/tmp/p2")
@@ -108,8 +112,7 @@ class VapidTestCase(unittest.TestCase):
         claims = {"aud": "example.com", "sub": "admin@example.com"}
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
-            'id=previous,'
-            'p256ecdsa=' + T_PUBLIC_RAW)
+            'id=previous;p256ecdsa=' + T_PUBLIC_RAW)
         items = jws.verify(result['Authorization'].split(' ')[1],
                            v.public_key,
                            algorithms=["ES256"])
