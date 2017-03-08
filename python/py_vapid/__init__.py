@@ -127,7 +127,8 @@ class Vapid01(object):
         :rtype: str
 
         """
-        sig = self.private_key.sign(validation_token,
+        sig = self.private_key.sign(
+            validation_token,
             hashfunc=self._hasher)
         verification_token = base64.urlsafe_b64encode(sig)
         return verification_token
@@ -149,7 +150,7 @@ class Vapid01(object):
 
     def _base_sign(self, claims):
         if not claims.get('exp'):
-            claims['exp'] = int(time.time()) + 86400
+            claims['exp'] = str(int(time.time()) + 86400)
         if not claims.get('sub'):
             raise VapidException(
                 "Missing 'sub' from claims. "

@@ -17,31 +17,33 @@ def main():
                         default=False, action="store_true")
     parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
                         default=True, action="store_true")
+    parser.add_argument('--json',  help="dump as json",
+                        default=False, action="store_true")
     args = parser.parse_args()
     Vapid = Vapid01
     if args.version2:
         Vapid = Vapid02
     if not os.path.exists('private_key.pem'):
-        print "No private_key.pem file found."
+        print("No private_key.pem file found.")
         answer = None
         while answer not in ['y', 'n']:
-            answer = raw_input("Do you want me to create one for you? (Y/n)")
+            answer = input("Do you want me to create one for you? (Y/n)")
             if not answer:
                 answer = 'y'
             answer = answer.lower()[0]
             if answer == 'n':
-                print "Sorry, can't do much for you then."
+                print ("Sorry, can't do much for you then.")
                 exit
             if answer == 'y':
                 break
         Vapid().save_key('private_key.pem')
     vapid = Vapid('private_key.pem')
     if not os.path.exists('public_key.pem'):
-        print "No public_key.pem file found. You'll need this to access "
-        print "the developer dashboard."
+        print("No public_key.pem file found. You'll need this to access "
+              "the developer dashboard.")
         answer = None
         while answer not in ['y', 'n']:
-            answer = raw_input("Do you want me to create one for you? (Y/n)")
+            answer = input("Do you want me to create one for you? (Y/n)")
             if not answer:
                 answer = 'y'
             answer = answer.lower()[0]
@@ -50,8 +52,8 @@ def main():
     claim_file = args.sign
     if claim_file:
         if not os.path.exists(claim_file):
-            print "No %s file found." % claim_file
-            print """
+            print("No {} file found.".format(claim_file))
+            print("""
 The claims file should be a JSON formatted file that holds the
 information that describes you. There are three elements in the claims
 file you'll need:
@@ -70,25 +72,27 @@ to overly large headers. See https://jwt.io/introduction/ for details.
 For example, a claims.json file could contain:
 
 {"sub": "mailto:admin@example.com"}
-"""
+""")
             exit
         try:
             claims = json.loads(open(claim_file).read())
             result = vapid.sign(claims)
-        except Exception, exc:
-            print "Crap, something went wrong: %s", repr(exc)
+        except Exception as exc:
+            print("Crap, something went wrong: {}".format(repr(exc)))
             raise exc
-
-        print "Include the following headers in your request:\n"
+        if args.json:
+            print(json.dumps(result))
+            return
+        print("Include the following headers in your request:\n")
         for key, value in result.items():
-            print "%s: %s" % (key, value)
-        print "\n"
+            print("{}: {}\n".format(key, value))
+        print("\n")
 
     token = args.validate
     if token:
-        print "signed token for dashboard validation:\n"
-        print vapid.validate(token)
-        print "\n"
+        print("signed token for dashboard validation:\n")
+        print(vapid.validate(token))
+        print("\n")
 
 
 if __name__ == '__main__':
