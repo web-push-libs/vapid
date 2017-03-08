@@ -2,4 +2,4 @@ include *.md
 include *.txt
 include setup.*
 include LICENSE
-recursive-include py_vapid
+recursive-include py_vapid *.py

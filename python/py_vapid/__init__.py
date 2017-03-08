@@ -127,7 +127,8 @@ class Vapid01(object):
         :rtype: str
 
         """
-        sig = self.private_key.sign(validation_token,
+        sig = self.private_key.sign(
+            validation_token,
             hashfunc=self._hasher)
         verification_token = base64.urlsafe_b64encode(sig)
         return verification_token
@@ -149,7 +150,7 @@ class Vapid01(object):
 
     def _base_sign(self, claims):
         if not claims.get('exp'):
-            claims['exp'] = int(time.time()) + 86400
+            claims['exp'] = str(int(time.time()) + 86400)
         if not claims.get('sub'):
             raise VapidException(
                 "Missing 'sub' from claims. "
@@ -176,9 +177,12 @@ class Vapid01(object):
         claims = self._base_sign(claims)
         sig = jws.sign(claims, self.private_key, algorithm="ES256")
         pkey = 'p256ecdsa='
-        pkey += self.encode(self.public_key.to_string())
+        pubkey = self.public_key.to_string()
+        if len(pubkey) == 64:
+            pubkey = b'\04' + pubkey
+        pkey += self.encode(pubkey)
         if crypto_key:
-            crypto_key = crypto_key + ',' + pkey
+            crypto_key = crypto_key + ';' + pkey
         else:
             crypto_key = pkey
 
