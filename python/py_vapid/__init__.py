@@ -177,9 +177,12 @@ class Vapid01(object):
         claims = self._base_sign(claims)
         sig = jws.sign(claims, self.private_key, algorithm="ES256")
         pkey = 'p256ecdsa='
-        pkey += self.encode(self.public_key.to_string())
+        pubkey = self.public_key.to_string()
+        if len(pubkey) == 64:
+            pubkey = b'\04' + pubkey
+        pkey += self.encode(pubkey)
         if crypto_key:
-            crypto_key = crypto_key + ',' + pkey
+            crypto_key = crypto_key + ';' + pkey
         else:
             crypto_key = pkey
 
