@@ -33,13 +33,13 @@ def main():
             print("No private_key.pem file found.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = input("Do you want me to create one for you? (Y/n)")
+                answer = raw_input("Do you want me to create one for you? (Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
                 if answer == 'n':
                     print("Sorry, can't do much for you then.")
-                    exit
+                    exit(1)
         print("Generating private_key.pem")
         Vapid().save_key('private_key.pem')
     vapid = Vapid.from_file('private_key.pem')
@@ -49,13 +49,13 @@ def main():
                   "the developer dashboard.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = input("Do you want me to create one for you? (Y/n)")
+                answer = raw_input("Do you want me to create one for you? (Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
                 if answer == 'n':
                     print("Exiting...")
-                    exit
+                    exit(0)
         print("Generating public_key.pem")
         vapid.save_public_key('public_key.pem')
     claim_file = args.sign
@@ -86,7 +86,7 @@ For example, a claims.json file could contain:
 
 {"sub": "mailto:admin@example.com"}
 """)
-            exit
+            exit(1)
         try:
             claims = json.loads(open(claim_file).read())
             result.update(vapid.sign(claims))
