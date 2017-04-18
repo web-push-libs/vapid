@@ -10,21 +10,25 @@ from mock import patch
 from jose import jws
 from py_vapid import Vapid01, Vapid02, VapidException
 
+# This is a private key in DER form.
 T_DER = """
 MHcCAQEEIPeN1iAipHbt8+/KZ2NIF8NeN24jqAmnMLFZEMocY8RboAoGCCqGSM49
 AwEHoUQDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hbWAUpQFKDByKB81yldJ9GTklB
 M5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 """
+
+# This is the same private key, in PEM form.
 T_PRIVATE = ("-----BEGIN EC PRIVATE KEY-----{}"
              "-----END EC PRIVATE KEY-----\n").format(T_DER)
 
+# This is a public key in PEM form.
 T_PUBLIC = """-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hb
 WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 -----END PUBLIC KEY-----
 """
 
-# this is a DER RAW key ('\x04' + 2 32 octet digits)
+# this is a public key in uncompressed form ('\x04' + 2 * 32 octets)
 # Remember, this should have any padding stripped.
 T_PUBLIC_RAW = (
     "BBCcCWavxjfIyW6NRhqclO9IZj9oW1gFKUBSgwcigfNc"
@@ -33,12 +37,12 @@ T_PUBLIC_RAW = (
 
 
 def setUp(self):
-    ff = open('/tmp/private', 'w')
-    ff.write(T_PRIVATE)
-    ff.close()
-    ff = open('/tmp/public', 'w')
-    ff.write(T_PUBLIC)
-    ff.close()
+    with open('/tmp/private', 'w') as ff:
+        ff.write(T_PRIVATE)
+    with open('/tmp/public', 'w') as ff:
+        ff.write(T_PUBLIC)
+    with open('/tmp/private.der', 'w') as ff:
+        ff.write(T_DER)
 
 
 def tearDown(self):
@@ -48,17 +52,20 @@ def tearDown(self):
 
 class VapidTestCase(unittest.TestCase):
     def test_init(self):
-        v1 = Vapid01(private_key_file="/tmp/private")
+        v1 = Vapid01.from_file("/tmp/private")
         eq_(v1.private_key.to_pem(), T_PRIVATE.encode('utf8'))
         eq_(v1.public_key.to_pem(), T_PUBLIC.encode('utf8'))
-        v2 = Vapid01(private_key=T_PRIVATE)
+        v2 = Vapid01.from_pem(T_PRIVATE)
         eq_(v2.private_key.to_pem(), T_PRIVATE.encode('utf8'))
         eq_(v2.public_key.to_pem(), T_PUBLIC.encode('utf8'))
-        v3 = Vapid01(private_key=T_DER)
+        v3 = Vapid01.from_der(T_DER)
         eq_(v3.private_key.to_pem(), T_PRIVATE.encode('utf8'))
         eq_(v3.public_key.to_pem(), T_PUBLIC.encode('utf8'))
+        v4 = Vapid01.from_file("/tmp/private.der")
+        eq_(v4.private_key.to_pem(), T_PRIVATE.encode('utf8'))
+        eq_(v4.public_key.to_pem(), T_PUBLIC.encode('utf8'))
         no_exist = '/tmp/not_exist'
-        Vapid01(private_key_file=no_exist)
+        Vapid01.from_file(no_exist)
         ok_(os.path.isfile(no_exist))
         os.unlink(no_exist)
 
@@ -68,7 +75,7 @@ class VapidTestCase(unittest.TestCase):
     @patch("ecdsa.SigningKey.from_pem", side_effect=Exception)
     def test_init_bad_priv(self, mm):
         self.assertRaises(Exception,
-                          Vapid01,
+                          Vapid01.from_file,
                           private_key_file="/tmp/private")
 
     def test_private(self):
@@ -98,7 +105,7 @@ class VapidTestCase(unittest.TestCase):
         os.unlink("/tmp/p2")
 
     def test_validate(self):
-        v = Vapid01("/tmp/private")
+        v = Vapid01.from_file("/tmp/private")
         msg = "foobar".encode('utf8')
         vtoken = v.validate(msg)
         ok_(v.public_key.verify(base64.urlsafe_b64decode(vtoken),
@@ -108,7 +115,7 @@ class VapidTestCase(unittest.TestCase):
         ok_(v.verify_token(msg, vtoken))
 
     def test_sign_01(self):
-        v = Vapid01("/tmp/private")
+        v = Vapid01.from_file("/tmp/private")
         claims = {"aud": "example.com", "sub": "admin@example.com"}
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
@@ -123,7 +130,7 @@ class VapidTestCase(unittest.TestCase):
             'p256ecdsa=' + T_PUBLIC_RAW)
 
     def test_sign_02(self):
-        v = Vapid02("/tmp/private")
+        v = Vapid02.from_file("/tmp/private")
         claims = {"aud": "example.com",
                   "sub": "admin@example.com",
                   "foo": "extra value"}
@@ -144,7 +151,7 @@ class VapidTestCase(unittest.TestCase):
             eq_(t_val[k], claims[k])
 
     def test_bad_sign(self):
-        v = Vapid01("/tmp/private")
+        v = Vapid01.from_file("/tmp/private")
         self.assertRaises(VapidException,
                           v.sign,
                           {'aud': "p.example.com"})
