@@ -33,7 +33,8 @@ def main():
             print("No private_key.pem file found.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input("Do you want me to create one for you? (Y/n)")
+                answer = raw_input("Do you want me to create one for you? "
+                                   "(Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
@@ -49,7 +50,8 @@ def main():
                   "the developer dashboard.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input("Do you want me to create one for you? (Y/n)")
+                answer = raw_input("Do you want me to create one for you? "
+                                   "(Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
