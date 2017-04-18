@@ -17,6 +17,7 @@ VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
 
 
 def b64urldecode(data):
+    """Decodes an unpadded Base64url-encoded string."""
     return base64.urlsafe_b64decode(data + "===="[:len(data) % 4])
 
 
@@ -48,6 +49,13 @@ class Vapid01(object):
 
     @classmethod
     def from_raw(cls, private_key):
+        """Initialize VAPID using a private key point in "raw" or
+        "uncompressed" form.
+
+        :param private_key: A private key point in uncompressed form.
+        :type private_key: str
+
+        """
         key = ecdsa.SigningKey.from_string(b64urldecode(private_key),
                                            curve=cls._curve,
                                            hashfunc=cls._hasher)
