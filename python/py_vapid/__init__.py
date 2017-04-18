@@ -21,6 +21,12 @@ def b64urldecode(data):
     return base64.urlsafe_b64decode(data + "===="[:len(data) % 4])
 
 
+def b64urlencode(bstring):
+    return binascii.b2a_base64(
+        bstring).decode('utf8').replace('\n', '').replace(
+        '+', '-').replace('/', '_').replace('=', '')
+
+
 class VapidException(Exception):
     """An exception wrapper for Vapid."""
     pass
@@ -205,11 +211,6 @@ class Vapid01(object):
                 "'sub' is your admin email as a mailto: link.")
         return claims
 
-    def encode(self, bstring):
-        return binascii.b2a_base64(
-            bstring).decode('utf8').replace('\n', '').replace(
-            '+', '-').replace('/', '_').replace('=', '')
-
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
         :param claims: JSON object containing the JWT claims to use.
@@ -228,7 +229,7 @@ class Vapid01(object):
         pubkey = self.public_key.to_string()
         if len(pubkey) == 64:
             pubkey = b'\04' + pubkey
-        pkey += self.encode(pubkey)
+        pkey += b64urlencode(pubkey)
         if crypto_key:
             crypto_key = crypto_key + ';' + pkey
         else:
@@ -257,7 +258,7 @@ class Vapid02(Vapid01):
             "Authorization": "{schema} t={t},k={k}".format(
                 schema=self._schema,
                 t=sig,
-                k=self.encode(pkey)
+                k=b64urlencode(pkey)
             )
         }
 
