@@ -16,6 +16,10 @@ from jose import jws
 VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
 
 
+def b64urldecode(data):
+    return base64.urlsafe_b64decode(data + "===="[:len(data) % 4])
+
+
 class VapidException(Exception):
     """An exception wrapper for Vapid."""
     pass
@@ -41,6 +45,13 @@ class Vapid01(object):
 
         """
         self.private_key = private_key
+
+    @classmethod
+    def from_raw(cls, private_key):
+        key = ecdsa.SigningKey.from_string(b64urldecode(private_key),
+                                           curve=cls._curve,
+                                           hashfunc=cls._hasher)
+        return cls(key)
 
     @classmethod
     def from_pem(cls, private_key):

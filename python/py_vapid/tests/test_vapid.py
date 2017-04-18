@@ -21,6 +21,12 @@ M5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 T_PRIVATE = ("-----BEGIN EC PRIVATE KEY-----{}"
              "-----END EC PRIVATE KEY-----\n").format(T_DER)
 
+# This is the same private key, as a point in uncompressed form. This should
+# be Base64url-encoded without padding.
+T_RAW = """
+943WICKkdu3z78pnY0gXw143biOoCacwsVkQyhxjxFs
+"""
+
 # This is a public key in PEM form.
 T_PUBLIC = """-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hb
@@ -103,6 +109,11 @@ class VapidTestCase(unittest.TestCase):
         v.generate_keys()
         v.save_public_key("/tmp/p2")
         os.unlink("/tmp/p2")
+
+    def test_from_raw(self):
+        v = Vapid01.from_raw(T_RAW)
+        eq_(v.private_key.to_pem(), T_PRIVATE.encode('utf8'))
+        eq_(v.public_key.to_pem(), T_PUBLIC.encode('utf8'))
 
     def test_validate(self):
         v = Vapid01.from_file("/tmp/private")
