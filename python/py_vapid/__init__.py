@@ -16,6 +16,11 @@ from jose import jws
 VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
 
 
+def b64urldecode(data):
+    """Decodes an unpadded Base64url-encoded string."""
+    return base64.urlsafe_b64decode(data + "===="[:len(data) % 4])
+
+
 class VapidException(Exception):
     """An exception wrapper for Vapid."""
     pass
@@ -29,36 +34,79 @@ class Vapid01(object):
     """
     _private_key = None
     _public_key = None
+    _curve = ecdsa.NIST256p
     _hasher = hashlib.sha256
     _schema = "WebPush"
 
-    def __init__(self, private_key_file=None, private_key=None):
-        """Initialize VAPID using an optional file containing a private key
-        in PEM format, or a string containing the PEM formatted private key.
+    def __init__(self, private_key=None):
+        """Initialize VAPID with an optional private key.
 
-        :param private_key_file: Name of the file containing the private key
-        :type private_key_file: str
-        :param private_key: A private key in PEM format
+        :param private_key: A private key object
+        :type private_key: ecdsa.SigningKey
+
+        """
+        self.private_key = private_key
+
+    @classmethod
+    def from_raw(cls, private_key):
+        """Initialize VAPID using a private key point in "raw" or
+        "uncompressed" form.
+
+        :param private_key: A private key point in uncompressed form.
         :type private_key: str
 
         """
-        if private_key_file:
-            if not os.path.isfile(private_key_file):
-                self.save_key(private_key_file)
-                return
-            private_key = open(private_key_file, 'r').read()
-        if private_key:
-            try:
-                if "BEGIN EC" in private_key:
-                    self._private_key = ecdsa.SigningKey.from_pem(private_key)
-                else:
-                    self._private_key = \
-                        ecdsa.SigningKey.from_der(
-                            base64.urlsafe_b64decode(private_key))
-            except Exception as exc:
-                logging.error("Could not open private key file: %s", repr(exc))
-                raise VapidException(exc)
-            self._public_key = self._private_key.get_verifying_key()
+        key = ecdsa.SigningKey.from_string(b64urldecode(private_key),
+                                           curve=cls._curve,
+                                           hashfunc=cls._hasher)
+        return cls(key)
+
+    @classmethod
+    def from_pem(cls, private_key):
+        """Initialize VAPID using a private key in PEM format.
+
+        :param private_key: A private key in PEM format.
+        :type private_key: str
+
+        """
+        key = ecdsa.SigningKey.from_pem(private_key)
+        return cls(key)
+
+    @classmethod
+    def from_der(cls, private_key):
+        """Initialize VAPID using a private key in DER format.
+
+        :param private_key: A private key in DER format and Base64-encoded.
+        :type private_key: str
+
+        """
+        key = ecdsa.SigningKey.from_der(base64.b64decode(private_key))
+        return cls(key)
+
+    @classmethod
+    def from_file(cls, private_key_file=None):
+        """Initialize VAPID using a file containing a private key in PEM or
+        DER format.
+
+        :param private_key_file: Name of the file containing the private key
+        :type private_key_file: str
+
+        """
+        if not os.path.isfile(private_key_file):
+            vapid = cls()
+            vapid.save_key(private_key_file)
+            return vapid
+        private_key = open(private_key_file, 'r').read()
+        vapid = None
+        try:
+            if "BEGIN EC" in private_key:
+                vapid = cls.from_pem(private_key)
+            else:
+                vapid = cls.from_der(private_key)
+        except Exception as exc:
+            logging.error("Could not open private key file: %s", repr(exc))
+            raise VapidException(exc)
+        return vapid
 
     @property
     def private_key(self):
@@ -77,6 +125,7 @@ class Vapid01(object):
 
         """
         self._private_key = value
+        self._public_key = None
 
     @property
     def public_key(self):
@@ -92,8 +141,7 @@ class Vapid01(object):
 
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
-        self.private_key = ecdsa.SigningKey.generate(curve=ecdsa.NIST256p)
-        self._public_key = self.private_key.get_verifying_key()
+        self.private_key = ecdsa.SigningKey.generate(curve=self._curve)
 
     def save_key(self, key_file):
         """Save the private key to a PEM file.

@@ -39,7 +39,7 @@ def main():
                     exit
         print("Generating private_key.pem")
         Vapid().save_key('private_key.pem')
-    vapid = Vapid('private_key.pem')
+    vapid = Vapid.from_file('private_key.pem')
     if args.gen or not os.path.exists('public_key.pem'):
         if not args.gen:
             print("No public_key.pem file found. You'll need this to access "
