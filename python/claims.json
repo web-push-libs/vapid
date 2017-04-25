@@ -1,3 +1,6 @@
 {
-    "sub": "mailto:webpush_ops@catfacts.example.com"
+ "sub": "mailto:admin@example.com",
+ "aud": "https://push.services.mozilla.com",
+ "exp": "1463001340"
 }
+

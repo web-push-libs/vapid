@@ -25,6 +25,12 @@ def main():
                         help="show applicationServerKey value",
                         default=False, action="store_true")
     args = parser.parse_args()
+
+    # Added to solve 2.7 => 3.* incompatibility
+    try:
+        input = raw_input
+    except NameError:
+        pass
     Vapid = Vapid01
     if args.version2:
         Vapid = Vapid02
@@ -33,8 +39,8 @@ def main():
             print("No private_key.pem file found.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input("Do you want me to create one for you? "
-                                   "(Y/n)")
+                answer = input("Do you want me to create one for you? "
+                               "(Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
@@ -50,8 +56,8 @@ def main():
                   "the developer dashboard.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input("Do you want me to create one for you? "
-                                   "(Y/n)")
+                answer = input("Do you want me to create one for you? "
+                               "(Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]

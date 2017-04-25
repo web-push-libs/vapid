@@ -37,7 +37,8 @@
     <div class="description">This is the content of the
         <code>Authorization</code> header included as part of the subscription
         POST update.</div>
-    <textarea name="auth" placeholder="Bearer abCDef..."></textarea>
+    <textarea name="auth" id="auth" placeholder="WebPush abCDef..."></textarea>
+    <div class="v1">
     <label for="crypt">Crypto-Key Header:</label>
     <div class="description">This is included
         as part of the <code>Crypto-Key</code> header, which is included
@@ -45,11 +46,7 @@
         may contain more than one part. Each part should be separated by a
         comma (",") (NOTE: For Draft-02, this header is not required)</div>
     <textarea name="crypt" placeholder="p256ecdsa=abCDef.."></textarea>
-    <div class="control">
-    <label for="publicKey">Public Key:</label>
-    <div class="description">This is the VAPID key you would use when adding
-        applications to your Dashboard.</div>
-    <div name="publicKey" class="value" ></div>
+    </div>
     <button id="check">Check headers</button>
 </div>
 </div>
@@ -82,14 +79,7 @@
     <button id="gen">Generate VAPID</button>
     </div>
     <h3>Claims JSON object:</h3>
-    <pre class="brush: js line-numbers lanuage-js">
-    <code id="raw_claims" >None</code>
-    </pre>
-    <div id="ignored" class="hidden">
-        <div class="title">The following were ignored.
-             <div class="items"></div>
-        </div>
-    </div>
+    <pre class="brush: js line-numbers lanuage-js"><code id="raw_claims" >None</code></pre>
 </div>
 <div id="keys" class="section">
     <a name="export"><h2>Exported Keys</h2></a>
@@ -127,6 +117,26 @@ function vapid_version() {
   return new VapidToken02();
 }
 
+function vers_click(e) {
+    if (document.getElementById('version').getElementsByTagName('input')[0].checked) {
+        document.getElementById('auth').placeholder="WebPush abCDef...";
+        for (item of document.getElementsByClassName('v2')) {
+            item.classList.add('hidden')
+        }
+        for (item of document.getElementsByClassName('v1')) {
+            item.classList.remove('hidden')
+        }
+    } else {
+        document.getElementById('auth').placeholder="vapid t=abCDef..., k=aBcD...";
+        for (item of document.getElementsByClassName('v1')) {
+            item.classList.add('hidden')
+        }
+        for (item of document.getElementsByClassName('v2')) {
+            item.classList.remove('hidden')
+        }
+    }
+}
+
 function error(ex=null, msg=null, clear=false) {
     let er = document.getElementById("err");
     if (clear) {
@@ -142,6 +152,7 @@ function error(ex=null, msg=null, clear=false) {
 }
 
 function success(claims) {
+    document.getElementById('raw_claims').innerHTML = JSON.stringify(claims, null, 2);
     for (let n of ["sub", "exp"]) {
         let item = document.getElementsByName(n)[0];
         item.value = claims[n];
@@ -151,13 +162,6 @@ function success(claims) {
     let err = document.getElementById("err");
     err.innerHTML = "";
     err.classList.add("hidden");
-    let extra = JSON.stringify(claims, "    ");
-    if (extra.length > 2) {
-        let ignored = document.getElementsById("ignored");
-        ignored.getElementsByClassName("items")
-            .innerHTML = extra;
-        ignored.classList.remove("hidden");
-    }
 }
 
 
@@ -304,6 +308,8 @@ function check(){
     }
 }
 
+
+document.getElementById("version").addEventListener("click", vers_click);
 document.getElementById("check").addEventListener("click", check);
 document.getElementById("gen").addEventListener("click", gen);
 document.getElementById('vapid_exp').value = parseInt(Date.now()*.001) + 86400;
