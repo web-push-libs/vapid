@@ -5,7 +5,7 @@ A set of VAPID encoding libraries for popular languages.
 ***PLEASE FEEL FREE TO SUBMIT YOUR FAVORITE LANGUAGE!***
 
 VAPID is a draft specification for providing self identification.
-see https://datatracker.ietf.org/doc/draft-thomson-webpush-vapid/
+see https://datatracker.ietf.org/doc/draft-ietf-webpush-vapid/
 for the latest specification.
 
 ## TL;DR:
