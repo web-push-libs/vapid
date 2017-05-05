@@ -5,26 +5,20 @@
 import os
 import logging
 import binascii
-import base64
 import time
-import hashlib
+import re
 
-import ecdsa
-from jose import jws
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
+
+from cryptography.hazmat.primitives import hashes
+
+from py_vapid.utils import b64urldecode, b64urlencode
+from py_vapid.jwt import sign
 
 # Show compliance version. For earlier versions see previously tagged releases.
 VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
-
-
-def b64urldecode(data):
-    """Decodes an unpadded Base64url-encoded string."""
-    return base64.urlsafe_b64decode(data + "===="[:len(data) % 4])
-
-
-def b64urlencode(bstring):
-    return binascii.b2a_base64(
-        bstring).decode('utf8').replace('\n', '').replace(
-        '+', '-').replace('/', '_').replace('=', '')
 
 
 class VapidException(Exception):
@@ -40,8 +34,6 @@ class Vapid01(object):
     """
     _private_key = None
     _public_key = None
-    _curve = ecdsa.NIST256p
-    _hasher = hashlib.sha256
     _schema = "WebPush"
 
     def __init__(self, private_key=None):
@@ -52,19 +44,23 @@ class Vapid01(object):
 
         """
         self.private_key = private_key
+        if private_key:
+            self._public_key = self.private_key.public_key()
 
     @classmethod
-    def from_raw(cls, private_key):
+    def from_raw(cls, private_raw):
         """Initialize VAPID using a private key point in "raw" or
-        "uncompressed" form.
+        "uncompressed" form. Raw keys consist of a single, 32 octet
+        encoded integer.
 
-        :param private_key: A private key point in uncompressed form.
-        :type private_key: str
+        :param private_raw: A private key point in uncompressed form.
+        :type private_raw: bytes
 
         """
-        key = ecdsa.SigningKey.from_string(b64urldecode(private_key),
-                                           curve=cls._curve,
-                                           hashfunc=cls._hasher)
+        key = ec.derive_private_key(
+            int(binascii.hexlify(b64urldecode(private_raw)), 16),
+            curve=ec.SECP256R1(),
+            backend=default_backend())
         return cls(key)
 
     @classmethod
@@ -72,21 +68,24 @@ class Vapid01(object):
         """Initialize VAPID using a private key in PEM format.
 
         :param private_key: A private key in PEM format.
-        :type private_key: str
+        :type private_key: bytes
 
         """
-        key = ecdsa.SigningKey.from_pem(private_key)
-        return cls(key)
+        # not sure why, but load_pem_private_key fails to deserialize
+        return cls.from_der(
+            b''.join(private_key.splitlines()[1:-1]))
 
     @classmethod
     def from_der(cls, private_key):
         """Initialize VAPID using a private key in DER format.
 
         :param private_key: A private key in DER format and Base64-encoded.
-        :type private_key: str
+        :type private_key: bytes
 
         """
-        key = ecdsa.SigningKey.from_der(base64.b64decode(private_key))
+        key = serialization.load_der_private_key(b64urldecode(private_key),
+                                                 password=None,
+                                                 backend=default_backend())
         return cls(key)
 
     @classmethod
@@ -100,26 +99,25 @@ class Vapid01(object):
         """
         if not os.path.isfile(private_key_file):
             vapid = cls()
+            vapid.generate_keys()
             vapid.save_key(private_key_file)
             return vapid
         private_key = open(private_key_file, 'r').read()
-        vapid = None
         try:
-            if "BEGIN EC" in private_key:
-                vapid = cls.from_pem(private_key)
+            if "-----BEGIN" in private_key:
+                vapid = cls.from_pem(private_key.encode('utf8'))
             else:
-                vapid = cls.from_der(private_key)
+                vapid = cls.from_der(private_key.encode('utf8'))
+            return vapid
         except Exception as exc:
             logging.error("Could not open private key file: %s", repr(exc))
             raise VapidException(exc)
-        return vapid
 
     @property
     def private_key(self):
         """The VAPID private ECDSA key"""
         if not self._private_key:
-            raise VapidException(
-                "No private key defined. Please import or generate a key.")
+            raise VapidException("No private key. Call generate_keys()")
         return self._private_key
 
     @private_key.setter
@@ -127,27 +125,43 @@ class Vapid01(object):
         """Set the VAPID private ECDSA key
 
         :param value: the byte array containing the private ECDSA key data
-        :type value: bytes
+        :type value: ec.EllipticCurvePrivateKey
 
         """
         self._private_key = value
-        self._public_key = None
+        if value:
+            self._public_key = self.private_key.public_key()
 
     @property
     def public_key(self):
         """The VAPID public ECDSA key
 
         The public key is currently read only. Set it via the `.private_key`
-        method.
+        method. This will autogenerate a public and private key if no value
+        has been set.
+
+        :returns ec.EllipticCurvePublicKey
 
         """
-        if not self._public_key:
-            self._public_key = self.private_key.get_verifying_key()
         return self._public_key
 
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
-        self.private_key = ecdsa.SigningKey.generate(curve=self._curve)
+        self.private_key = ec.generate_private_key(ec.SECP256R1,
+                                                   default_backend())
+
+    def private_pem(self):
+        return self.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+    def public_pem(self):
+        return self.public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
 
     def save_key(self, key_file):
         """Save the private key to a PEM file.
@@ -156,11 +170,9 @@ class Vapid01(object):
         :type key_file: str
 
         """
-        file = open(key_file, "wb")
-        if not self._private_key:
-            self.generate_keys()
-        file.write(self._private_key.to_pem())
-        file.close()
+        with open(key_file, "wb") as file:
+            file.write(self.private_pem())
+            file.close()
 
     def save_public_key(self, key_file):
         """Save the public key to a PEM file.
@@ -169,7 +181,7 @@ class Vapid01(object):
 
         """
         with open(key_file, "wb") as file:
-            file.write(self.public_key.to_pem())
+            file.write(self.public_pem())
             file.close()
 
     def validate(self, validation_token):
@@ -183,8 +195,8 @@ class Vapid01(object):
         """
         sig = self.private_key.sign(
             validation_token,
-            hashfunc=self._hasher)
-        verification_token = base64.urlsafe_b64encode(sig)
+            signature_algorithm=ec.ECDSA(hashes.SHA256()))
+        verification_token = b64urlencode(sig)
         return verification_token
 
     def verify_token(self, validation_token, verification_token):
@@ -198,17 +210,30 @@ class Vapid01(object):
         :rtype: boolean
 
         """
-        hsig = base64.urlsafe_b64decode(verification_token)
-        return self.public_key.verify(hsig, validation_token,
-                                      hashfunc=self._hasher)
+        hsig = b64urldecode(verification_token.encode('utf8'))
+        return self.public_key.verify(
+            hsig,
+            validation_token,
+            signature_algorithm=ec.ECDSA(hashes.SHA256())
+        )
 
     def _base_sign(self, claims):
         if not claims.get('exp'):
             claims['exp'] = str(int(time.time()) + 86400)
-        if not claims.get('sub'):
+        if not re.match("mailto:.+@.+\..+",
+                        claims.get('sub', ''),
+                        re.IGNORECASE):
             raise VapidException(
                 "Missing 'sub' from claims. "
                 "'sub' is your admin email as a mailto: link.")
+        if not re.match("^https?:\/\/[^\/\.:]+\.[^\/:]+(:\d+)?$",
+                        claims.get("aud", ""),
+                        re.IGNORECASE):
+            raise VapidException(
+                "Missing 'aud' from claims. "
+                "'aud' is the scheme, host and optional port for this "
+                "transaction e.g. https://example.com:8080")
+
         return claims
 
     def sign(self, claims, crypto_key=None):
@@ -224,12 +249,10 @@ class Vapid01(object):
 
         """
         claims = self._base_sign(claims)
-        sig = jws.sign(claims, self.private_key, algorithm="ES256")
+        sig = sign(claims, self.private_key)
         pkey = 'p256ecdsa='
-        pubkey = self.public_key.to_string()
-        if len(pubkey) == 64:
-            pubkey = b'\04' + pubkey
-        pkey += b64urlencode(pubkey)
+        pkey += b64urlencode(
+            self.public_key.public_numbers().encode_point())
         if crypto_key:
             crypto_key = crypto_key + ';' + pkey
         else:
@@ -249,11 +272,8 @@ class Vapid02(Vapid01):
 
     def sign(self, claims, crypto_key=None):
         claims = self._base_sign(claims)
-        sig = jws.sign(claims, self.private_key, algorithm="ES256")
-        pkey = self.public_key.to_string()
-        # Make sure that the key is properly prefixed.
-        if len(pkey) == 64:
-            pkey = b'\04' + pkey
+        sig = sign(claims, self.private_key)
+        pkey = self.public_key.public_numbers().encode_point()
         return{
             "Authorization": "{schema} t={t},k={k}".format(
                 schema=self._schema,

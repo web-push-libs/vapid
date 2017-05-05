@@ -14,7 +14,7 @@ fields.
 
 At a minimum a VAPID claim set should look like:
 ```
-{"sub":"mailto:YourEmail@YourSite.com","aud":"https://PushServerURL","exp":"ExpirationTimestamp"}
+{"sub":"mailto:YourEmail@YourSite.com","aud":"https://PushServer","exp":"ExpirationTimestamp"}
 ```
 A few notes:
 
@@ -24,14 +24,14 @@ email that will be used to contact you (for instance). This can be a
 general delivery address like "`mailto:push_operations@example.com`" or a
 specific address like "`mailto:bob@example.com`".
 
-***aud*** is the audience for the VAPID. This it the host path you use to
-send subscription endpoints and generally coincides with the
-`endpoint` specified in the Subscription Info block.
+***aud*** is the audience for the VAPID. This is the scheme and host
+you use to send subscription endpoints and generally coincides with
+the `endpoint` specified in the Subscription Info block.
 
 As example, if a WebPush subscription info contains:
 `{"endpoint": "https://push.example.com:8012/v1/push/...", ...}`
 
-then the `aud` would be "`https://push.example.com:8012/`"
+then the `aud` would be "`https://push.example.com:8012`"
 
 While some Push Services consider this an optional field, others may
 be stricter.
@@ -39,13 +39,13 @@ be stricter.
 ***exp*** This is the UTC timestamp for when this VAPID request will
 expire. The maximum period is 24 hours. Setting a shorter period can
 prevent "replay" attacks. Setting a longer period allows you to reuse
-headers for multiple sends (e.g. if you're sending hundreds of updates 
+headers for multiple sends (e.g. if you're sending hundreds of updates
 within an hour or so.) If no `exp` is included, one that will expire
 in 24 hours will be auto-generated for you.
 
 Claims should be stored in a JSON compatible file. In the examples
-below, we've stored the claims into a file named `claims.json`. 
- 
+below, we've stored the claims into a file named `claims.json`.
+
 py_vapid can either be installed as a library or used as a stand along
 app, `bin/vapid`.
 
@@ -64,9 +64,9 @@ bin/python setup.py install
 Run by itself, `bin/vapid` will check and optionally create the
 public_key.pem and private_key.pem files.
 
-`bin/vapid -gen` can be used to generate a new set of public and 
-private key PEM files. These will overwrite the contents of 
-`private_key.pem` and `public_key.pem`. 
+`bin/vapid -gen` can be used to generate a new set of public and
+private key PEM files. These will overwrite the contents of
+`private_key.pem` and `public_key.pem`.
 
 `bin/vapid --sign claims.json` will generate a set of HTTP headers
 from a JSON formatted claims file. A sample `claims.json` is included
