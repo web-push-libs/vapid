@@ -1,4 +1,5 @@
 import base64
+import binascii
 
 
 def b64urldecode(data):
@@ -23,3 +24,16 @@ def b64urlencode(data):
 
     """
     return base64.urlsafe_b64encode(data).replace(b'=', b'').decode('utf8')
+
+
+def num_to_bytes(n):
+    """Returns the byte representation of an integer, in big-endian order.
+
+    :param n: The integer to encode.
+    :type n: int
+
+    :returns bytes
+
+    """
+    h = '%x' % n
+    return binascii.unhexlify('0' * (len(h) % 2) + h)
