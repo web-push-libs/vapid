@@ -6,12 +6,11 @@ import unittest
 from nose.tools import eq_, ok_
 from mock import patch, Mock
 
-from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes
 
 from py_vapid import Vapid01, Vapid02, VapidException
 from py_vapid.jwt import decode
-from py_vapid.utils import b64urldecode
 
 # This is a private key in DER form.
 T_DER = """
@@ -173,27 +172,6 @@ class VapidTestCase(unittest.TestCase):
         eq_(len(k_val), 65)
         for k in claims:
             eq_(t_val[k], claims[k])
-
-    def test_alt_sign(self):
-        """ecdsa uses a raw key pair to sign, openssl uses a DER."""
-        v = Vapid01.from_file("/tmp/private")
-        claims = {"aud": "https://example.com",
-                  "sub": "mailto:admin@example.com",
-                  "foo": "extra value"}
-        # Get a signed token.
-        result = v.sign(claims)
-        # Convert the dss into raw.
-        auth, sig = result.get('Authorization').split(' ')[1].rsplit('.', 1)
-        ss = utils.decode_dss_signature(b64urldecode(sig.encode('utf8')))
-        new_sig = binascii.b2a_base64(
-            binascii.unhexlify("%064x%064x" % ss)
-        ).strip().strip(b'=').decode()
-        new_auth = auth + '.' + new_sig
-        # phew, all that done, now check
-        pkey = result.get("Crypto-Key").split('=')[1]
-        items = decode(new_auth, pkey)
-
-        eq_(items, claims)
 
     def test_bad_sign(self):
         v = Vapid01.from_file("/tmp/private")
