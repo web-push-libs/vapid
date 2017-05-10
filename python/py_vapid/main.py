@@ -9,12 +9,20 @@ import json
 from py_vapid import Vapid01, Vapid02, b64urlencode
 
 
+def prompt(prompt):
+    # Not sure why, but python3 throws and exception if you try to
+    # monkeypatch for this. It's ugly, but this seems to play nicer.
+    try:
+        return input(prompt)
+    except NameError:
+        return raw_input(prompt)  # noqa: F821
+
+
 def main():
     parser = argparse.ArgumentParser(description="VAPID tool")
     parser.add_argument('--sign', '-s', help='claims file to sign')
     parser.add_argument('--gen', '-g', help='generate new key pairs',
                         default=False, action="store_true")
-    parser.add_argument('--validate', '-v', help='dashboard token to validate')
     parser.add_argument('--version2', '-2', help="use VAPID spec Draft-02",
                         default=False, action="store_true")
     parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
@@ -27,10 +35,6 @@ def main():
     args = parser.parse_args()
 
     # Added to solve 2.7 => 3.* incompatibility
-    try:
-        input = raw_input
-    except NameError:
-        pass
     Vapid = Vapid01
     if args.version2:
         Vapid = Vapid02
@@ -39,38 +43,26 @@ def main():
             print("No private_key.pem file found.")
             answer = None
             while answer not in ['y', 'n']:
-                answer = input("Do you want me to create one for you? "
-                               "(Y/n)")
+                answer = prompt("Do you want me to create one for you? (Y/n)")
                 if not answer:
                     answer = 'y'
                 answer = answer.lower()[0]
                 if answer == 'n':
                     print("Sorry, can't do much for you then.")
                     exit(1)
+        vapid = Vapid()
+        vapid.generate_keys()
         print("Generating private_key.pem")
-        Vapid().save_key('private_key.pem')
-    vapid = Vapid.from_file('private_key.pem')
-    if args.gen or not os.path.exists('public_key.pem'):
-        if not args.gen:
-            print("No public_key.pem file found. You'll need this to access "
-                  "the developer dashboard.")
-            answer = None
-            while answer not in ['y', 'n']:
-                answer = input("Do you want me to create one for you? "
-                               "(Y/n)")
-                if not answer:
-                    answer = 'y'
-                answer = answer.lower()[0]
-                if answer == 'n':
-                    print("Exiting...")
-                    exit(0)
+        vapid.save_key('private_key.pem')
         print("Generating public_key.pem")
         vapid.save_public_key('public_key.pem')
+    vapid = Vapid.from_file('private_key.pem')
     claim_file = args.sign
     result = dict()
     if args.applicationServerKey:
+        raw_pub = vapid.public_key.public_numbers().encode_point()
         print("Application Server Key = {}\n\n".format(
-            b64urlencode(vapid.public_key.to_string())))
+            b64urlencode(raw_pub)))
     if claim_file:
         if not os.path.exists(claim_file):
             print("No {} file found.".format(claim_file))
