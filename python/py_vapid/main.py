@@ -101,12 +101,6 @@ For example, a claims.json file could contain:
             print("{}: {}\n".format(key, value))
         print("\n")
 
-    token = args.validate
-    if token:
-        print("signed token for dashboard validation:\n")
-        print(vapid.validate(token))
-        print("\n")
-
 
 if __name__ == '__main__':
     main()
