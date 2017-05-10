@@ -145,8 +145,8 @@ class VapidTestCase(unittest.TestCase):
         eq_(result['Crypto-Key'],
             'id=previous;p256ecdsa=' + T_PUBLIC_RAW.decode('utf8'))
         pkey = binascii.b2a_base64(
-                v.public_key.public_numbers().encode_point()
-            ).decode('utf8').replace('+', '-').replace('/', '_').strip()
+            v.public_key.public_numbers().encode_point()
+        ).decode('utf8').replace('+', '-').replace('/', '_').strip()
         items = decode(result['Authorization'].split(' ')[1], pkey)
         eq_(items, claims)
         result = v.sign(claims)
