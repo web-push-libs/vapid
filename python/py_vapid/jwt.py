@@ -6,13 +6,12 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives import hashes
 
-from py_vapid.utils import b64urldecode, b64urlencode
+from py_vapid.utils import b64urldecode, b64urlencode, num_to_bytes
 
 
 def extract_signature(auth):
-    """Fix the JWT auth token
-
-    convert a ecdsa integer pair into an OpenSSL DER pair.
+    """Extracts the payload and signature from a JWT, converting from RFC7518
+    to RFC 3279
 
     :param auth: A JWT Authorization Token.
     :type auth: str
@@ -23,7 +22,7 @@ def extract_signature(auth):
     payload, asig = auth.encode('utf8').rsplit(b'.', 1)
     sig = b64urldecode(asig)
     if len(sig) != 64:
-        return payload, sig
+        raise InvalidSignature()
 
     encoded = utils.encode_dss_signature(
         s=int(binascii.hexlify(sig[32:]), 16),
@@ -34,8 +33,6 @@ def extract_signature(auth):
 
 def decode(token, key):
     """Decode a web token into an assertion dictionary
-
-    This attempts to rectify both ecdsa and openssl generated signatures.
 
     :param token: VAPID auth token
     :type token: str
@@ -80,9 +77,12 @@ def sign(claims, key):
 
     """
     header = b64urlencode(b"""{"typ":"JWT","alg":"ES256"}""")
+    # Unfortunately, chrome seems to require the claims to be sorted.
     claims = b64urlencode(json.dumps(claims,
-                                     separators=(',', ':')).encode('utf8'))
+                                     separators=(',', ':'),
+                                     sort_keys=True).encode('utf8'))
     token = "{}.{}".format(header, claims)
     rsig = key.sign(token.encode('utf8'), ec.ECDSA(hashes.SHA256()))
-    sig = b64urlencode(rsig)
+    (r, s) = utils.decode_dss_signature(rsig)
+    sig = b64urlencode(num_to_bytes(r) + num_to_bytes(s))
     return "{}.{}".format(token, sig)
