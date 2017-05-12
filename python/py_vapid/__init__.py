@@ -9,7 +9,7 @@ import time
 import re
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, utils as ecutils
 from cryptography.hazmat.primitives import serialization
 
 from cryptography.hazmat.primitives import hashes
@@ -64,6 +64,16 @@ class Vapid01(object):
         return cls(key)
 
     @classmethod
+    def from_raw_public(cls, public_raw):
+        key = ec.EllipticCurvePublicNumbers.from_encoded_point(
+            curve=ec.SECP256R1(),
+            data=b64urldecode(public_raw)
+        ).public_key(default_backend())
+        ss = cls()
+        ss._public_key = key
+        return ss
+
+    @classmethod
     def from_pem(cls, private_key):
         """Initialize VAPID using a private key in PEM format.
 
@@ -112,6 +122,16 @@ class Vapid01(object):
         except Exception as exc:
             logging.error("Could not open private key file: %s", repr(exc))
             raise VapidException(exc)
+
+    @classmethod
+    def verify(cls, key, auth):
+        # TODO: add v2 validation
+        tokens = auth.rsplit(' ', 1)[1].rsplit('.', 1)
+        kp = cls().from_raw_public(key.encode())
+        return kp.verify_token(
+            validation_token=tokens[0].encode(),
+            verification_token=tokens[1]
+        )
 
     @property
     def private_key(self):
@@ -184,21 +204,6 @@ class Vapid01(object):
             file.write(self.public_pem())
             file.close()
 
-    def validate(self, validation_token):
-        """Sign a Valdiation token from the dashboard
-
-        :param validation_token: Short validation token from the dev dashboard
-        :type validation_token: str
-        :returns: corresponding token for key verification
-        :rtype: str
-
-        """
-        sig = self.private_key.sign(
-            validation_token,
-            signature_algorithm=ec.ECDSA(hashes.SHA256()))
-        verification_token = b64urlencode(sig)
-        return verification_token
-
     def verify_token(self, validation_token, verification_token):
         """Internally used to verify the verification token is correct.
 
@@ -211,8 +216,10 @@ class Vapid01(object):
 
         """
         hsig = b64urldecode(verification_token.encode('utf8'))
+        r = int(binascii.hexlify(hsig[:32]), 16)
+        s = int(binascii.hexlify(hsig[32:]), 16)
         return self.public_key.verify(
-            hsig,
+            ecutils.encode_dss_signature(r, s),
             validation_token,
             signature_algorithm=ec.ECDSA(hashes.SHA256())
         )
