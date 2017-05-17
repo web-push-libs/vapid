@@ -75,6 +75,16 @@ with this distribution.
 `bin/vapid --sign claims.json --json` will output the headers in
 JSON format, which may be useful for other programs.
 
+`bin/vapid --applicationServerKey` will return the
+`applicationServerKey` value you can use to make a restricted
+endpoint. See
+https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe
+for more details. Be aware that this value is tied to the generated
+public/private key. If you remove or generate a new key, any
+restricted URL you've previously generated will need to be
+reallocated. Please note that some User Agents may require you [to
+decode this string into a Uint8Array](https://github.com/GoogleChrome/push-notifications/blob/master/app/scripts/main.js). 
+
 See `bin/vapid -h` for all options and commands.
 
 
