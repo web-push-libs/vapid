@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, utils as ecutils
 from cryptography.hazmat.primitives import serialization
 
 from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
 
 from py_vapid.utils import b64urldecode, b64urlencode
 from py_vapid.jwt import sign
@@ -112,7 +113,8 @@ class Vapid01(object):
             vapid.generate_keys()
             vapid.save_key(private_key_file)
             return vapid
-        private_key = open(private_key_file, 'r').read()
+        with open(private_key_file, 'r') as file:
+            private_key = file.read()
         try:
             if "-----BEGIN" in private_key:
                 vapid = cls.from_pem(private_key.encode('utf8'))
@@ -218,11 +220,15 @@ class Vapid01(object):
         hsig = b64urldecode(verification_token.encode('utf8'))
         r = int(binascii.hexlify(hsig[:32]), 16)
         s = int(binascii.hexlify(hsig[32:]), 16)
-        return self.public_key.verify(
-            ecutils.encode_dss_signature(r, s),
-            validation_token,
-            signature_algorithm=ec.ECDSA(hashes.SHA256())
-        )
+        try:
+            self.public_key.verify(
+                ecutils.encode_dss_signature(r, s),
+                validation_token,
+                signature_algorithm=ec.ECDSA(hashes.SHA256())
+            )
+            return True
+        except InvalidSignature:
+            return False
 
     def _base_sign(self, claims):
         if not claims.get('exp'):
