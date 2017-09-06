@@ -1,0 +1,10 @@
+[package]
+name = "vapid"
+version = "0.1.0"
+authors = ["jrconlin <jconlin+git@mozilla.com>"]
+
+[dependencies]
+openssl = "0.9.16"
+serde_json = "1.0.2"
+base64 = "0.6.0"
+time = "0.1"
