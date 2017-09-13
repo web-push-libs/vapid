@@ -230,9 +230,27 @@ class Vapid01(object):
         except InvalidSignature:
             return False
 
+    def default_exp(self):
+        """Get a default expiration time.
+
+        This will either use an environment variable of `VAPID_DEFAULT_EXP`
+        or approximately 12 hours. This will also do bound checks on the
+        environment variable to ensure that the value legitimate.
+
+        """
+        try:
+            env = int(os.environ.get('VAPID_DEFAULT_EXP', '43200'))
+            if env > 86400:
+                env = 86400
+            elif env < 0:
+                env = 0
+        except (TypeError, ValueError):
+            env = 43200
+        return str(time.time() + env)
+
     def _base_sign(self, claims):
         if not claims.get('exp'):
-            claims['exp'] = str(int(time.time()) + 86400)
+            claims['exp'] = self.default_exp()
         if not re.match("mailto:.+@.+\..+",
                         claims.get('sub', ''),
                         re.IGNORECASE):

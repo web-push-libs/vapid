@@ -122,6 +122,35 @@ class VapidTestCase(unittest.TestCase):
         v = Vapid01.from_raw(T_RAW)
         self.check_keys(v)
 
+    @patch('os.environ.get', return_value=None)
+    @patch('time.time', return_value=0)
+    def test_default_exp(self, m_time, m_env):
+        v = Vapid01()
+
+        # check default
+        xx = v.default_exp()
+        eq_(xx, '43200')
+
+        # check environ
+        m_env.return_value = '12345'
+        xx = v.default_exp()
+        eq_(xx, '12345')
+
+        # check large environ
+        m_env.return_value = '90000'
+        xx = v.default_exp()
+        eq_(xx, '86400')
+
+        # check small environ
+        m_env.return_value = '-60'
+        xx = v.default_exp()
+        eq_(xx, '0')
+
+        # check invalid environ
+        m_env.return_value = 'BOGUS'
+        xx = v.default_exp()
+        eq_(xx, '43200')
+
     def test_sign_01(self):
         v = Vapid01.from_file("/tmp/private")
         claims = {"aud": "https://example.com",

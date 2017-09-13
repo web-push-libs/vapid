@@ -46,6 +46,11 @@ headers for multiple sends (e.g. if you're sending hundreds of updates
 within an hour or so.) If no ``exp`` is included, one that will expire
 in 24 hours will be auto-generated for you.
 
+The default expiration is the current time + 43200 seconds (about 12
+hours). If you wish, you can set your preferred expiration period via an
+environment variable ``VAPID_DEFAULT_EXP``. The value will be limited to
+a max of ``86400`` (24 hours) and ``0``.
+
 Claims should be stored in a JSON compatible file. In the examples
 below, we've stored the claims into a file named ``claims.json``.
 
