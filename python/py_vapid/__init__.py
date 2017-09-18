@@ -127,7 +127,14 @@ class Vapid01(object):
 
     @classmethod
     def verify(cls, key, auth):
-        # TODO: add v2 validation
+        """Verify a VAPID authorization token.
+
+        :param key: base64 serialized public key
+        :type key: str
+        :param auth: authorization token
+        type key: str
+
+        """
         tokens = auth.rsplit(' ', 1)[1].rsplit('.', 1)
         kp = cls().from_raw_public(key.encode())
         return kp.verify_token(
@@ -294,6 +301,26 @@ class Vapid02(Vapid01):
                 k=b64urlencode(pkey)
             )
         }
+
+    @classmethod
+    def verify(cls, auth):
+        pref_tok = auth.rsplit(' ', 1)
+        assert pref_tok[0].lower() == cls._schema, (
+                "Incorrect schema specified")
+        parts = {}
+        for tok in pref_tok[1].split(','):
+            kv = tok.split('=', 1)
+            parts[kv[0]] = kv[1]
+        assert 'k' in parts.keys(), (
+                "Auth missing public key 'k' value")
+        assert 't' in parts.keys(), (
+                "Auth missing token set 't' value")
+        kp = cls().from_raw_public(parts['k'].encode())
+        tokens = parts['t'].rsplit('.', 1)
+        return kp.verify_token(
+            validation_token=tokens[0].encode(),
+            verification_token=tokens[1]
+        )
 
 
 Vapid = Vapid01
