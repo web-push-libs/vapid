@@ -122,8 +122,14 @@ class VapidTestCase(unittest.TestCase):
         v = Vapid01.from_raw(T_RAW)
         self.check_keys(v)
 
+    def test_from_string(self):
+        v1 = Vapid01.from_string(T_DER)
+        v2 = Vapid01.from_string(T_RAW.decode())
+        self.check_keys(v1)
+        self.check_keys(v2)
+
     def test_sign_01(self):
-        v = Vapid01.from_file("/tmp/private")
+        v = Vapid01.from_string(T_DER)
         claims = {"aud": "https://example.com",
                   "sub": "mailto:admin@example.com"}
         result = v.sign(claims, "id=previous")

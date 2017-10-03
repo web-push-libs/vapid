@@ -126,6 +126,22 @@ class Vapid01(object):
             raise VapidException(exc)
 
     @classmethod
+    def from_string(cls, private_key):
+        """Initialize VAPID using a string containing the private key. This
+        will try to determine if the key is in RAW or DER format.
+
+        :param private_key: String containing the key info
+        :type private_key: str
+
+        """
+
+        pkey = private_key.encode().replace(b"\n", b"")
+        key = b64urldecode(pkey)
+        if len(key) == 32:
+            return cls.from_raw(pkey)
+        return cls.from_der(pkey)
+
+    @classmethod
     def verify(cls, key, auth):
         """Verify a VAPID authorization token.
 
