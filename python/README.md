@@ -64,7 +64,7 @@ bin/python setup.py install
 Run by itself, `bin/vapid` will check and optionally create the
 public_key.pem and private_key.pem files.
 
-`bin/vapid -gen` can be used to generate a new set of public and
+`bin/vapid --gen` can be used to generate a new set of public and
 private key PEM files. These will overwrite the contents of
 `private_key.pem` and `public_key.pem`.
 
