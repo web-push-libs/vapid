@@ -41,7 +41,7 @@ class Vapid01(object):
         """Initialize VAPID with an optional private key.
 
         :param private_key: A private key object
-        :type private_key: ecdsa.SigningKey
+        :type private_key: ec.EllipticCurvePrivateKey
 
         """
         self.private_key = private_key
