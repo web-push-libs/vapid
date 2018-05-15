@@ -1,5 +1,6 @@
 import binascii
 import base64
+import copy
 import os
 import json
 import unittest
@@ -139,7 +140,8 @@ class VapidTestCase(unittest.TestCase):
             v.public_key.public_numbers().encode_point()
         ).decode('utf8').replace('+', '-').replace('/', '_').strip()
         items = decode(result['Authorization'].split(' ')[1], pkey)
-        eq_(items, claims)
+        for k in claims:
+            eq_(items[k], claims[k])
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
             'p256ecdsa=' + T_PUBLIC_RAW.decode('utf8'))
@@ -155,6 +157,7 @@ class VapidTestCase(unittest.TestCase):
         claims = {"aud": "https://example.com",
                   "sub": "mailto:admin@example.com",
                   "foo": "extra value"}
+        claim_check = copy.deepcopy(claims)
         result = v.sign(claims, "id=previous")
         auth = result['Authorization']
         eq_(auth[:6], 'vapid ')
@@ -168,6 +171,7 @@ class VapidTestCase(unittest.TestCase):
         k_val = binascii.a2b_base64(self.repad(parts[1][2:]))
         eq_(binascii.hexlify(k_val)[:2], b'04')
         eq_(len(k_val), 65)
+        eq_(claims, claim_check)
         for k in claims:
             eq_(t_val[k], claims[k])
 

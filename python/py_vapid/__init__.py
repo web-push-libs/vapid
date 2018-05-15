@@ -7,6 +7,7 @@ import logging
 import binascii
 import time
 import re
+import copy
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec, utils as ecutils
@@ -254,23 +255,24 @@ class Vapid01(object):
             return False
 
     def _base_sign(self, claims):
-        if not claims.get('exp'):
-            claims['exp'] = str(int(time.time()) + 86400)
+        cclaims = copy.deepcopy(claims)
+        if not cclaims.get('exp'):
+            cclaims['exp'] = str(int(time.time()) + 86400)
         if not re.match("mailto:.+@.+\..+",
-                        claims.get('sub', ''),
+                        cclaims.get('sub', ''),
                         re.IGNORECASE):
             raise VapidException(
                 "Missing 'sub' from claims. "
                 "'sub' is your admin email as a mailto: link.")
         if not re.match("^https?:\/\/[^\/\.:]+\.[^\/:]+(:\d+)?$",
-                        claims.get("aud", ""),
+                        cclaims.get("aud", ""),
                         re.IGNORECASE):
             raise VapidException(
                 "Missing 'aud' from claims. "
                 "'aud' is the scheme, host and optional port for this "
                 "transaction e.g. https://example.com:8080")
 
-        return claims
+        return cclaims
 
     def sign(self, claims, crypto_key=None):
         """Sign a set of claims.
@@ -284,8 +286,7 @@ class Vapid01(object):
         :rtype: dict
 
         """
-        claims = self._base_sign(claims)
-        sig = sign(claims, self.private_key)
+        sig = sign(self._base_sign(claims), self.private_key)
         pkey = 'p256ecdsa='
         pkey += b64urlencode(
             self.public_key.public_numbers().encode_point())
@@ -307,8 +308,7 @@ class Vapid02(Vapid01):
     _schema = "vapid"
 
     def sign(self, claims, crypto_key=None):
-        claims = self._base_sign(claims)
-        sig = sign(claims, self.private_key)
+        sig = sign(self._base_sign(claims), self.private_key)
         pkey = self.public_key.public_numbers().encode_point()
         return{
             "Authorization": "{schema} t={t},k={k}".format(
