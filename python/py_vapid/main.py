@@ -6,6 +6,8 @@ import argparse
 import os
 import json
 
+from cryptography.hazmat.primitives import serialization
+
 from py_vapid import Vapid01, Vapid02, b64urlencode
 
 
@@ -60,7 +62,10 @@ def main():
     claim_file = args.sign
     result = dict()
     if args.applicationServerKey:
-        raw_pub = vapid.public_key.public_numbers().encode_point()
+        raw_pub = vapid.public_key.public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint
+            )
         print("Application Server Key = {}\n\n".format(
             b64urlencode(raw_pub)))
     if claim_file:
