@@ -4,6 +4,7 @@ import copy
 import os
 import json
 import unittest
+from cryptography.hazmat.primitives import serialization
 from nose.tools import eq_, ok_
 from mock import patch, Mock
 
@@ -137,7 +138,10 @@ class VapidTestCase(unittest.TestCase):
         eq_(result['Crypto-Key'],
             'id=previous;p256ecdsa=' + T_PUBLIC_RAW.decode('utf8'))
         pkey = binascii.b2a_base64(
-            v.public_key.public_numbers().encode_point()
+            v.public_key.public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint
+            )
         ).decode('utf8').replace('+', '-').replace('/', '_').strip()
         items = decode(result['Authorization'].split(' ')[1], pkey)
         for k in claims:

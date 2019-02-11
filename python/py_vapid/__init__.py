@@ -258,13 +258,13 @@ class Vapid01(object):
         cclaims = copy.deepcopy(claims)
         if not cclaims.get('exp'):
             cclaims['exp'] = str(int(time.time()) + 86400)
-        if not re.match("mailto:.+@.+\..+",
+        if not re.match(r'mailto:.+@.+\..+',
                         cclaims.get('sub', ''),
                         re.IGNORECASE):
             raise VapidException(
                 "Missing 'sub' from claims. "
                 "'sub' is your admin email as a mailto: link.")
-        if not re.match("^https?:\/\/[^\/\.:]+\.[^\/:]+(:\d+)?$",
+        if not re.match(r"^https?://[^/.:]+\.[^/:]+(:\d+)?$",
                         cclaims.get("aud", ""),
                         re.IGNORECASE):
             raise VapidException(
@@ -289,7 +289,10 @@ class Vapid01(object):
         sig = sign(self._base_sign(claims), self.private_key)
         pkey = 'p256ecdsa='
         pkey += b64urlencode(
-            self.public_key.public_numbers().encode_point())
+            self.public_key.public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint
+            ))
         if crypto_key:
             crypto_key = crypto_key + ';' + pkey
         else:
@@ -309,7 +312,10 @@ class Vapid02(Vapid01):
 
     def sign(self, claims, crypto_key=None):
         sig = sign(self._base_sign(claims), self.private_key)
-        pkey = self.public_key.public_numbers().encode_point()
+        pkey = self.public_key.public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint
+            )
         return{
             "Authorization": "{schema} t={t},k={k}".format(
                 schema=self._schema,
