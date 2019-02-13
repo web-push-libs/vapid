@@ -2,7 +2,6 @@ import binascii
 import json
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives import hashes
 
@@ -47,10 +46,10 @@ def decode(token, key):
     try:
         sig_material, signature = extract_signature(token)
         dkey = b64urldecode(key.encode('utf8'))
-        pkey = ec.EllipticCurvePublicNumbers.from_encoded_point(
+        pkey = ec.EllipticCurvePublicKey.from_encoded_point(
             ec.SECP256R1(),
             dkey,
-        ).public_key(default_backend())
+        )
         pkey.verify(
             signature,
             sig_material,
