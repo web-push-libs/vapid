@@ -3,12 +3,14 @@
 //! This library only supports the latest VAPID-draft-02+ specification.
 //!
 //! Example Use:
-//! ```
+//! ```rust,no_run
+//! use vapid::{Key, sign};
+//! use std::collections::HashMap;
 //!
 //! // Create a key from an existing EC Private Key PEM file.
 //! // You can generate this with
-//! // Key::generate().to_pem("pem/file/path.pem")?;
-//! let my_key = Key::from_pem("pem/file/path.pem")?;
+//! // Key::generate().to_pem("pem/file/path.pem");
+//! let my_key = Key::from_pem("pem/file/path.pem").unwrap();
 //!
 //! // Construct the Claims hashmap
 //! let mut claims:HashMap<String, serde_json::Value> = HashMap::new();
@@ -24,29 +26,34 @@
 //!
 //! // The result will contain the `Authorization:` header. How you inject this into your
 //! // request is left as an exercise.
-//! let authorization_header = sign(key, &mut claims)?;
+//! let authorization_header = sign(my_key, &mut claims).unwrap();
 //!
 //! ```
 
 extern crate base64;
+#[macro_use()]
 extern crate openssl;
 extern crate serde_json;
 extern crate time;
 
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 
 use openssl::bn::BigNumContext;
+use openssl::ec::{self, EcKey};
 use openssl::hash::MessageDigest;
-use openssl::ec;
 use openssl::nid;
+use openssl::pkey::{PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
-use openssl::pkey;
 
-pub struct Key(ec::EcKey);
+mod error;
+pub struct Key {
+    key: EcKey<Private>,
+}
 
 /// a Key is a helper for creating or using a VAPID EC key.
 ///
@@ -54,49 +61,43 @@ pub struct Key(ec::EcKey);
 ///
 impl Key {
     fn name() -> nid::Nid {
-        nid::X9_62_PRIME256V1
-    }
-
-    fn group() -> ec::EcGroup {
-        ec::EcGroup::from_curve_name(Key::name()).expect("EC Prime256v1 curve not supported")
+        nid::Nid::X9_62_PRIME256V1
     }
 
     /// Read a VAPID private key stored in `path`
-    pub fn from_pem<P>(path: P) -> Result<Key, String>
-        where P: AsRef<Path>{
+    pub fn from_pem<P>(path: P) -> error::VapidResult<Key>
+    where
+        P: AsRef<Path>,
+    {
         let mut pem_data = Vec::new();
-        File::open(&path)
-            .expect(&format!("Could not open file at {:?}",&path.as_ref()))
-            .read_to_end(&mut pem_data)
-            .expect(&format!("Could not read from file {:?}",&path.as_ref()));
-        let key_data = ec::EcKey::private_key_from_pem(&pem_data)
-            .expect("Could not read PEM key data");
-        Ok(Key(key_data))
+        let mut file = File::open(&path)?;
+        file.read_to_end(&mut pem_data)?;
+        Ok(Key {
+            key: PKey::private_key_from_pem(&pem_data)?.ec_key().unwrap(),
+        })
     }
 
     /// Write the VAPID private key as a PEM to `path`
-    pub fn to_pem(&self, path: &Path) -> Result<(), String> {
-        let key_data = self.0.private_key_to_pem().expect(
-            "Could not generate PEM for privakte key",
-        );
+    pub fn to_pem(&self, path: &Path) -> error::VapidResult<()> {
+        let key_data: Vec<u8> = self.key.private_key_to_pem()?;
         File::create(&path)
-            .expect(&format!("Could not open file at {:?}",path.to_str().unwrap()))
-            .write(&key_data).expect(
-            &format!("Could not write PEM data to file {}",path.to_str().unwrap()));
+            .map_err(|e| { error::VapidErrorKind::InternalError(format!("Could not create file {:?}, {:?}", path, e))})?
+            .write_all(&key_data)
+            .map_err(|e| { error::VapidErrorKind::InternalError(format!("Could not write to file {:?}, {:?}", path, e))})?;
         Ok(())
     }
 
     /// Create a new Vapid key
-    pub fn generate() -> Key {
-        Key(ec::EcKey::generate(&Key::group()).expect(
-            "Could not generate EC key",
-        ))
+    pub fn generate() -> error::VapidResult<Key> {
+        let group = ec::EcGroup::from_curve_name(Key::name())?;
+        let key = ec::EcKey::generate(&group)?;
+        Ok(Key { key })
     }
 
     /// Convert the private key into a base64 string
     pub fn to_private_raw(&self) -> String {
         // Return the private key as a raw bit array
-        let key = self.0.private_key().expect("Could not extract private key");
+        let key = self.key.private_key();
         base64::encode_config(&key.to_vec(), base64::URL_SAFE_NO_PAD)
     }
 
@@ -104,36 +105,28 @@ impl Key {
     pub fn to_public_raw(&self) -> String {
         //Return the public key as a raw bit array
         let mut ctx = BigNumContext::new().unwrap();
-        let group = Key::group();
+        let group = ec::EcGroup::from_curve_name(Key::name()).unwrap();
 
-        let key = self.0.public_key().unwrap();
-        let keybytes = key.to_bytes(&group, ec::POINT_CONVERSION_UNCOMPRESSED, &mut ctx)
+        let key = self.key.public_key();
+        let keybytes = key
+            .to_bytes(&group, ec::PointConversionForm::UNCOMPRESSED, &mut ctx)
             .unwrap();
         base64::encode_config(&keybytes, base64::URL_SAFE_NO_PAD)
     }
 
     /// Read the public key from an uncompressed, raw base64 string
-    pub fn from_public_raw(bits: String) -> Result<Key, String> {
+    pub fn from_public_raw(bits: String) -> error::VapidResult<ec::EcKey<Public>> {
         //Read a public key from a raw bit array
-        let bytes: Vec<u8> = base64::decode_config(&bits.into_bytes(),
-                                                   base64::URL_SAFE_NO_PAD).unwrap();
-        let group = Key::group();
+        let bytes: Vec<u8> =
+            base64::decode_config(&bits.into_bytes(), base64::URL_SAFE_NO_PAD).unwrap();
+        let mut ctx = BigNumContext::new().unwrap();
+        let group = ec::EcGroup::from_curve_name(nid::Nid::X9_62_PRIME256V1)?;
         if bytes.len() != 65 || bytes[0] != 4 {
             // It's not a properly tagged key.
-            return Err("Invalid key format for public key.".into());
+            return Err(error::VapidErrorKind::PublicKeyError.into());
         }
-
-        let x = openssl::bn::BigNum::from_slice(&bytes[1..33]).expect("Invalid public key");
-        let y = openssl::bn::BigNum::from_slice(&bytes[33..]).expect("Invalid public key");
-        let mut new_key = match ec::EcKeyBuilder::new() {
-            Ok(key) => key,
-            Err(err) => return Err(format!("Could not generate key: {}", err)),
-        };
-        new_key.set_group(&group).expect("Could not set group");
-        new_key.set_public_key_affine_coordinates(&x, &y).expect(
-            "Invalid coordiates for public key",
-        );
-        Ok(Key(new_key.build()))
+        let point = ec::EcPoint::from_bytes(&group, &bytes, &mut ctx)?;
+        Ok(ec::EcKey::from_public_key(&group, &point)?)
     }
 }
 
@@ -145,7 +138,7 @@ struct AuthElements {
 
 /// Parse the Authorization Header for useful things.
 fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
-    let mut parts: Vec<&str> = auth_token.split(" ").collect();
+    let mut parts: Vec<&str> = auth_token.split(' ').collect();
     let mut schema = parts.remove(0).to_lowercase();
     // Ignore the first token if it's the header line.
     if schema == "authorization:" {
@@ -157,28 +150,28 @@ fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
     };
     match schema.to_lowercase().as_ref() {
         "vapid" => {
-            for kvi in parts[0].splitn(2, ",") {
-                let kv: Vec<String> = kvi.splitn(2, "=").map(|x| String::from(x)).collect();
+            for kvi in parts[0].splitn(2, ',') {
+                let kv: Vec<String> = kvi.splitn(2, '=').map(String::from).collect();
                 match kv[0].to_lowercase().as_ref() {
                     "t" => {
-                        let ts: Vec<String> = kv[1].split(".").map(|x| String::from(x)).collect();
+                        let ts: Vec<String> = kv[1].split('.').map(String::from).collect();
                         if ts.len() != 3 {
                             return Err("Invalid t token specified".into());
                         }
                         let ttoken = format!("{}.{}", ts[0], ts[1]);
                         reply.t = vec![ttoken, ts[2].clone()];
                     }
-                    "k" => reply.k = String::from(kv[1].clone()),
+                    "k" => reply.k = kv[1].clone(),
                     _ => {}
                 }
             }
         }
         "webpush" => {
-            reply.t = parts[0].split(".").map(|x| String::from(x)).collect();
+            reply.t = parts[0].split('.').map(String::from).collect();
         }
         _ => return Err(format!("Unknown schema type: {}", parts[0])),
     };
-    return Ok(reply);
+    Ok(reply)
 }
 
 // Preferred schema
@@ -187,7 +180,10 @@ static SCHEMA: &str = "vapid";
 /// Convert the HashMap containing the claims into an Authorization header.
 /// `key` must be generated or initialized before this is used. See `Key::from_pem()` or
 /// `Key::generate()`.
-pub fn sign(key: Key, claims: &mut HashMap<String, serde_json::Value>) -> Result<String, String> {
+pub fn sign<S: BuildHasher>(
+    key: Key,
+    claims: &mut HashMap<String, serde_json::Value, S>,
+) -> error::VapidResult<String> {
     // this is the common, static header for all VAPID JWT objects.
     let prefix: String = "{\"typ\":\"JWT\",\"alg\":\"ES256\"}".into();
 
@@ -195,53 +191,69 @@ pub fn sign(key: Key, claims: &mut HashMap<String, serde_json::Value>) -> Result
     match claims.get("sub") {
         Some(sub) => {
             if !sub.as_str().unwrap().starts_with("mailto") {
-                return Err("\"sub\" not a valid HTML reference".into());
+                return Err(error::VapidErrorKind::VapidError(
+                    "'sub' not a valid HTML reference".to_owned(),
+                )
+                .into());
             }
         }
-        None => return Err("\"sub\" not found".into()),
+        None => {
+            return Err(error::VapidErrorKind::VapidError("'sub' not found".to_owned()).into());
+        }
     }
     let today = time::now_utc();
     let tomorrow = today + time::Duration::hours(24);
-    claims.entry(String::from("exp")).or_insert(
-        serde_json::Value::from(
-            tomorrow.to_timespec().sec,
-        ),
-    );
+    claims
+        .entry(String::from("exp"))
+        .or_insert_with(|| serde_json::Value::from(tomorrow.to_timespec().sec));
     match claims.get("exp") {
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
             if exp_val < today.to_timespec().sec {
-                return Err(String::from("\"exp\" already expired"));
+                return Err(error::VapidErrorKind::VapidError(
+                    r#""exp" already expired"#.to_owned(),
+                )
+                .into());
             }
             if exp_val > tomorrow.to_timespec().sec {
-                return Err(String::from("\"exp\" set too far ahead"));
+                return Err(error::VapidErrorKind::VapidError(
+                    r#""exp" set too far ahead"#.to_owned(),
+                )
+                .into());
             }
         }
         None => {
             // We already do an insertion on empty, so this should never trigger.
-            return Err(String::from("\"exp\" failed to initialize"));
+            return Err(error::VapidErrorKind::VapidError(
+                r#""exp" failed to initialize"#.to_owned(),
+            )
+            .into());
         }
     }
 
-    let json: String = serde_json::to_string(&claims).expect(
-        "Claims cannot be converted to a valid JSON structure.",
-    );
+    let json: String = serde_json::to_string(&claims)?;
     let content = format!(
         "{}.{}",
         base64::encode_config(&prefix, base64::URL_SAFE_NO_PAD),
         base64::encode_config(&json, base64::URL_SAFE_NO_PAD)
     );
     let auth_k = key.to_public_raw();
-    let pub_key = &pkey::PKey::from_ec_key(key.0).unwrap();
+    let pub_key = PKey::from_ec_key(key.key)?;
 
-    let mut signer = match Signer::new(MessageDigest::sha256(), pub_key) {
+    let mut signer = match Signer::new(MessageDigest::sha256(), &pub_key) {
         Ok(t) => t,
-        Err(err) => return Err(format!("Could not sign the claims: {:?}", err)),
+        Err(err) => {
+            return Err(error::VapidErrorKind::VapidError(format!(
+                "Could not sign the claims: {:?}",
+                err
+            ))
+            .into());
+        }
     };
-    signer.update(&content.clone().into_bytes()).expect(
-        "Could not encode data for signature",
-    );
-    let signature = signer.finish().expect("Could not finalize signature");
+    signer
+        .update(&content.clone().into_bytes())
+        .expect("Could not encode data for signature");
+    let signature = signer.sign_to_vec().expect("Could not finalize signature");
 
     // Decode signature BER to r,s pair
     let r_off: usize = 3;
@@ -277,20 +289,17 @@ pub fn sign(key: Key, claims: &mut HashMap<String, serde_json::Value>) -> Result
 
     Ok(format!(
         "Authorization: {} t={},k={}",
-        SCHEMA,
-        auth_t,
-        auth_k
+        SCHEMA, auth_t, auth_k
     ))
 }
 
 pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
-
     //Verify that the auth token string matches for the verification token string
-    let auth_token = parse_auth_token(&mut String::from(auth_token.clone()))
+    let auth_token = parse_auth_token(&auth_token.clone())
         .expect("Authorization header is invalid.");
     let pub_ec_key =
         Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");
-    let pub_key = &match pkey::PKey::from_ec_key(pub_ec_key.0) {
+    let pub_key = &match PKey::from_ec_key(pub_ec_key) {
         Ok(key) => key,
         Err(err) => return Err(format!("Public Key Generation error: {:?}", err)),
     };
@@ -303,10 +312,11 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
     let verif_sig = base64::decode_config(
         &auth_token.t[1].clone().into_bytes(),
         base64::URL_SAFE_NO_PAD,
-    ).expect("Signature failed to decode from base64");
-    verifier.update(data).expect(
-        "Data failed to load into verifier",
-    );
+    )
+    .expect("Signature failed to decode from base64");
+    verifier
+        .update(data)
+        .expect("Data failed to load into verifier");
 
     // Extract the values from the combined raw key.
     let mut r_val = Vec::with_capacity(32);
@@ -339,49 +349,50 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
     seq.append(&mut r_asn);
     seq.append(&mut s_asn);
 
-    match verifier.finish(&seq) {
+    match verifier.verify(&seq) {
         Ok(true) => {
             // Success! Return the decoded claims.
             let token = auth_token.t[0].clone();
-            let claim_data: Vec<&str> = token.split(".").collect();
+            let claim_data: Vec<&str> = token.split('.').collect();
             let bytes = base64::decode_config(&claim_data[1], base64::URL_SAFE_NO_PAD)
                 .expect("Claims were not properly base64 encoded");
-            Ok(
-                serde_json::from_str(&String::from_utf8(bytes).expect(
-                    "Claims included an invalid character and could not be decoded.",
-                )).expect("Claims are not valid JSON"),
+            Ok(serde_json::from_str(
+                &String::from_utf8(bytes)
+                    .expect("Claims included an invalid character and could not be decoded."),
             )
+            .expect("Claims are not valid JSON"))
         }
-        Ok(false) => Err(format!("Verify failed")),
+        Ok(false) => Err("Verify failed".to_string()),
         Err(err) => Err(format!("Verify failed {:?}", err)),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Key, *};
+    use std::collections::HashMap;
 
     fn test_claims() -> HashMap<String, serde_json::Value> {
-        let reply: HashMap<String, serde_json::Value> =
-            [
-                (
-                    String::from("sub"),
-                    serde_json::Value::from("mailto:admin@example.com"),
-                ),
-                (String::from("exp"), serde_json::Value::from("1463001340")),
-                (
-                    String::from("aud"),
-                    serde_json::Value::from("https://push.services.mozilla.com"),
-                ),
-            ].iter()
-                .cloned()
-                .collect();
+        let reply: HashMap<String, serde_json::Value> = [
+            (
+                String::from("sub"),
+                serde_json::Value::from("mailto:admin@example.com"),
+            ),
+            (String::from("exp"), serde_json::Value::from("1463001340")),
+            (
+                String::from("aud"),
+                serde_json::Value::from("https://push.services.mozilla.com"),
+            ),
+        ]
+        .iter()
+        .cloned()
+        .collect();
         reply
     }
 
     #[test]
     fn test_sign() {
-        let key = Key::generate();
+        let key = Key::generate().unwrap();
         let sub_val = serde_json::Value::from(String::from("mailto:mail@example.com"));
 
         let mut claims: HashMap<String, serde_json::Value> = HashMap::new();
@@ -409,16 +420,16 @@ mod tests {
         let token: Vec<&str> = auth_parts.get("t").unwrap().split(".").collect();
         assert_eq!(token.len(), 3);
 
-        let content = String::from_utf8(
-            base64::decode_config(token[0], base64::URL_SAFE_NO_PAD).unwrap(),
-        ).unwrap();
+        let content =
+            String::from_utf8(base64::decode_config(token[0], base64::URL_SAFE_NO_PAD).unwrap())
+                .unwrap();
         let items: HashMap<String, String> = serde_json::from_str(&content).unwrap();
         assert!(items.contains_key("typ"));
         assert!(items.contains_key("alg"));
 
-        let content: String = String::from_utf8(
-            base64::decode_config(token[1], base64::URL_SAFE_NO_PAD).unwrap(),
-        ).unwrap();
+        let content: String =
+            String::from_utf8(base64::decode_config(token[1], base64::URL_SAFE_NO_PAD).unwrap())
+                .unwrap();
         let items: HashMap<String, serde_json::Value> = serde_json::from_str(&content).unwrap();
 
         assert!(items.contains_key("exp"));
@@ -428,37 +439,41 @@ mod tests {
         // And verify that the signature works.
         // we do integration verify in `test_verify`
         verify(vresult).expect("Signed claims failed to self verify");
-
     }
 
     // TODO: Test fail cases, verification, values
 
     #[test]
-    fn test_sign_bad_sub(){
-        let key = Key::generate();
+    fn test_sign_bad_sub() {
+        let key = Key::generate().unwrap();
         let mut claims: HashMap<String, serde_json::Value> = HashMap::new();
-        claims.insert("sub".into(), serde_json::Value::from(String::from("invalid")));
+        claims.insert(
+            "sub".into(),
+            serde_json::Value::from(String::from("invalid")),
+        );
         match sign(key, &mut claims) {
-            Ok(_) => {
-                panic!("Failed to reject invalid sub")
-            },
+            Ok(_) => panic!("Failed to reject invalid sub"),
             Err(err) => {
-                assert!(err == String::from("\"sub\" not a valid HTML reference"));
+                // not sure how to
+                let errstr = format!("{:?}", err);
+                assert!(errstr.contains("not a valid HTML reference"));
             }
         }
     }
 
     #[test]
     fn test_sign_no_sub() {
-        let key = Key::generate();
+        let key = Key::generate().unwrap();
         let mut claims: HashMap<String, serde_json::Value> = HashMap::new();
-        claims.insert("blah".into(), serde_json::Value::from(String::from("mailto:a@b.c")));
+        claims.insert(
+            "blah".into(),
+            serde_json::Value::from(String::from("mailto:a@b.c")),
+        );
         match sign(key, &mut claims) {
-            Ok(_) => {
-                panic!("Failed to reject missing sub")
-            },
+            Ok(_) => panic!("Failed to reject missing sub"),
             Err(err) => {
-                assert!(err == String::from("\"sub\" not found"));
+                let errstr = format!("{:?}", err);
+                assert!(errstr.contains(" not found"));
             }
         }
     }
@@ -471,8 +486,9 @@ mod tests {
              ovL3B1c2guc2VydmljZXMubW96aWxsYS5jb20iLCJleHAiOiIxNDYzMDAxMzQwIiwic3ViIjoibWFp\
              bHRvOmFkbWluQGV4YW1wbGUuY29tIn0.4ZiULZaqZ8_7Cf2UYu7KO3eGaqZL5d4RZ6pwBvR0rcmTho\
              4WryVuZLfN-iMsHJ6Oc-4hkEZsMj8_32sXYSvTyg,k=BPD3F0hvy3Df69tjqRBN0ad08WH2nfaaxnp\
-             kuIO6BV9Pa7p8xA8GauX0R_S-D-k82kcTNsCiJ6ML-zJisBpyybs"
-        ].join("");
+             kuIO6BV9Pa7p8xA8GauX0R_S-D-k82kcTNsCiJ6ML-zJisBpyybs",
+        ]
+        .join("");
         assert!(test_claims() == verify(test_header).unwrap())
     }
 
