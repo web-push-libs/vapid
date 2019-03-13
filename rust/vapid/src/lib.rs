@@ -3,12 +3,14 @@
 //! This library only supports the latest VAPID-draft-02+ specification.
 //!
 //! Example Use:
-//! ```
+//! ```rust,no_run
+//! use vapid::{Key, sign};
+//! use std::collections::HashMap;
 //!
 //! // Create a key from an existing EC Private Key PEM file.
 //! // You can generate this with
-//! // Key::generate().to_pem("pem/file/path.pem")?;
-//! let my_key = Key::from_pem("pem/file/path.pem")?;
+//! // Key::generate().to_pem("pem/file/path.pem");
+//! let my_key = Key::from_pem("pem/file/path.pem").unwrap();
 //!
 //! // Construct the Claims hashmap
 //! let mut claims:HashMap<String, serde_json::Value> = HashMap::new();
@@ -24,7 +26,7 @@
 //!
 //! // The result will contain the `Authorization:` header. How you inject this into your
 //! // request is left as an exercise.
-//! let authorization_header = sign(key, &mut claims)?;
+//! let authorization_header = sign(my_key, &mut claims).unwrap();
 //!
 //! ```
 
@@ -362,7 +364,9 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{*, Key};
+    use std::collections::HashMap;
+
 
     fn test_claims() -> HashMap<String, serde_json::Value> {
         let reply: HashMap<String, serde_json::Value> = [
