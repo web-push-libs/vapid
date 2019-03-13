@@ -67,10 +67,10 @@ class Vapid01(object):
 
     @classmethod
     def from_raw_public(cls, public_raw):
-        key = ec.EllipticCurvePublicNumbers.from_encoded_point(
+        key = ec.EllipticCurvePublicKey.from_encoded_point(
             curve=ec.SECP256R1(),
             data=b64urldecode(public_raw)
-        ).public_key(default_backend())
+        )
         ss = cls()
         ss._public_key = key
         return ss
