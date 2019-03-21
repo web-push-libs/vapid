@@ -31,16 +31,14 @@
 //! ```
 
 extern crate base64;
-#[macro_use()]
+extern crate failure;
 extern crate openssl;
 extern crate serde_json;
 extern crate time;
 
 use std::collections::HashMap;
+use std::fs;
 use std::hash::BuildHasher;
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
 use std::path::Path;
 
 use openssl::bn::BigNumContext;
@@ -69,9 +67,7 @@ impl Key {
     where
         P: AsRef<Path>,
     {
-        let mut pem_data = Vec::new();
-        let mut file = File::open(&path)?;
-        file.read_to_end(&mut pem_data)?;
+        let pem_data = fs::read(&path)?;
         Ok(Key {
             key: PKey::private_key_from_pem(&pem_data)?.ec_key().unwrap(),
         })
@@ -80,10 +76,7 @@ impl Key {
     /// Write the VAPID private key as a PEM to `path`
     pub fn to_pem(&self, path: &Path) -> error::VapidResult<()> {
         let key_data: Vec<u8> = self.key.private_key_to_pem()?;
-        File::create(&path)
-            .map_err(|e| { error::VapidErrorKind::InternalError(format!("Could not create file {:?}, {:?}", path, e))})?
-            .write_all(&key_data)
-            .map_err(|e| { error::VapidErrorKind::InternalError(format!("Could not write to file {:?}, {:?}", path, e))})?;
+        fs::write(&path, &key_data)?;
         Ok(())
     }
 
@@ -295,8 +288,8 @@ pub fn sign<S: BuildHasher>(
 
 pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
     //Verify that the auth token string matches for the verification token string
-    let auth_token = parse_auth_token(&auth_token.clone())
-        .expect("Authorization header is invalid.");
+    let auth_token =
+        parse_auth_token(&auth_token.clone()).expect("Authorization header is invalid.");
     let pub_ec_key =
         Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");
     let pub_key = &match PKey::from_ec_key(pub_ec_key) {
@@ -454,7 +447,8 @@ mod tests {
         match sign(key, &mut claims) {
             Ok(_) => panic!("Failed to reject invalid sub"),
             Err(err) => {
-                // not sure how to
+                // not sure how to capture quoted elements in a string
+                // e.g. errstr.contains("\"sub\" not a valid HTML") fails.
                 let errstr = format!("{:?}", err);
                 assert!(errstr.contains("not a valid HTML reference"));
             }

@@ -22,14 +22,6 @@ pub enum VapidErrorKind {
     InternalError(String),
 }
 
-/*
-impl VapidError {
-    pub fn kind(&self) -> &VapidErrorKind {
-        self.inner.get_context()
-    }
-}
-*/
-
 impl Fail for VapidError {
     fn cause(&self) -> Option<&Fail> {
         self.inner.cause()
