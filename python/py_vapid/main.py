@@ -26,9 +26,9 @@ def main():
     parser.add_argument('--gen', '-g', help='generate new key pairs',
                         default=False, action="store_true")
     parser.add_argument('--version2', '-2', help="use RFC8292 VAPID spec",
-                        default=False, action="store_true")
-    parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
                         default=True, action="store_true")
+    parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
+                        default=False, action="store_true")
     parser.add_argument('--json',  help="dump as json",
                         default=False, action="store_true")
     parser.add_argument('--applicationServerKey',
