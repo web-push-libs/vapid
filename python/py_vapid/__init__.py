@@ -20,7 +20,7 @@ from py_vapid.utils import b64urldecode, b64urlencode
 from py_vapid.jwt import sign
 
 # Show compliance version. For earlier versions see previously tagged releases.
-VERSION = "VAPID-DRAFT-02/ECE-DRAFT-07"
+VERSION = "VAPID-RFC/ECE-RFC"
 
 
 class VapidException(Exception):
@@ -303,9 +303,9 @@ class Vapid01(object):
 
 
 class Vapid02(Vapid01):
-    """Minimal Vapid 02 signature generation library
+    """Minimal Vapid RFC8292 signature generation library
 
-    https://tools.ietf.org/html/draft-ietf-webpush-vapid-02
+    https://tools.ietf.org/html/rfc8292
 
     """
     _schema = "vapid"

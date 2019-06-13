@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--sign', '-s', help='claims file to sign')
     parser.add_argument('--gen', '-g', help='generate new key pairs',
                         default=False, action="store_true")
-    parser.add_argument('--version2', '-2', help="use VAPID spec Draft-02",
+    parser.add_argument('--version2', '-2', help="use RFC8292 VAPID spec",
                         default=False, action="store_true")
     parser.add_argument('--version1', '-1', help="use VAPID spec Draft-01",
                         default=True, action="store_true")
@@ -37,9 +37,9 @@ def main():
     args = parser.parse_args()
 
     # Added to solve 2.7 => 3.* incompatibility
-    Vapid = Vapid01
-    if args.version2:
-        Vapid = Vapid02
+    Vapid = Vapid02
+    if args.version1:
+        Vapid = Vapid01
     if args.gen or not os.path.exists('private_key.pem'):
         if not args.gen:
             print("No private_key.pem file found.")

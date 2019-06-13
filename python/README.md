@@ -1,3 +1,5 @@
+[![PyPI version py_vapid](https://badge.fury.io/py/py-vapid.svg)](https://pypi.org/project/py-vapid/)
+
 # Easy VAPID generation
 
 This minimal library contains the minimal set of functions you need to
