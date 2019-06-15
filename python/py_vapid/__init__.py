@@ -345,4 +345,4 @@ class Vapid02(Vapid01):
         )
 
 
-Vapid = Vapid01
+Vapid = Vapid02
