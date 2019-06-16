@@ -179,6 +179,17 @@ class VapidTestCase(unittest.TestCase):
         for k in claims:
             eq_(t_val[k], claims[k])
 
+    def test_sign_02_localhost(self):
+        v = Vapid02.from_file("/tmp/private")
+        claims = {"aud": "http://localhost:8000",
+                  "sub": "mailto:admin@example.com",
+                  "foo": "extra value"}
+        result = v.sign(claims, "id=previous")
+        auth = result['Authorization']
+        eq_(auth[:6], 'vapid ')
+        ok_(' t=' in auth)
+        ok_(',k=' in auth)
+
     def test_integration(self):
         # These values were taken from a test page. DO NOT ALTER!
         key = ("BDd3_hVL9fZi9Ybo2UUzA284WG5FZR30_95YeZJsiApwXKpNcF1rRPF3foI"

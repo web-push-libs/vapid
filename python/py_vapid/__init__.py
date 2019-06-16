@@ -264,7 +264,7 @@ class Vapid01(object):
             raise VapidException(
                 "Missing 'sub' from claims. "
                 "'sub' is your admin email as a mailto: link.")
-        if not re.match(r"^https?://[^/.:]+\.[^/:]+(:\d+)?$",
+        if not re.match(r"^https?://[^/:]+(:\d+)?$",
                         cclaims.get("aud", ""),
                         re.IGNORECASE):
             raise VapidException(
