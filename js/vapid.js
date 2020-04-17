@@ -135,6 +135,15 @@ class VapidCore {
         };
 
         return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
+            .catch(err => {
+                if (err instanceof TypeError && /namedCurve/.test(err.stack))
+                    return webCrypto.importKey('jwk', jwk, {
+                        name: "ECDSA",
+                        namedCurve: "P-256"
+                    }, true, ["verify"])
+                        .then(k => this._public_key = k)
+                throw err
+            })
             .then(k => this._public_key = k)
     }
 
