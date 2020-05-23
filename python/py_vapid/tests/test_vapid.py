@@ -11,8 +11,7 @@ from mock import patch, Mock
 from py_vapid import Vapid01, Vapid02, VapidException
 from py_vapid.jwt import decode
 
-# This is a private key in DER form.
-T_DER = """
+TEST_KEY_PRIVATE_DER = """
 MHcCAQEEIPeN1iAipHbt8+/KZ2NIF8NeN24jqAmnMLFZEMocY8RboAoGCCqGSM49
 AwEHoUQDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hbWAUpQFKDByKB81yldJ9GTklB
 M5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
@@ -25,17 +24,18 @@ key = dict(
 )
 
 # This is the same private key, in PEM form.
-T_PRIVATE = ("-----BEGIN PRIVATE KEY-----{}"
-             "-----END PRIVATE KEY-----\n").format(T_DER)
+TEST_KEY_PRIVATE_PEM = (
+    "-----BEGIN PRIVATE KEY-----{}"
+    "-----END PRIVATE KEY-----\n").format(TEST_KEY_PRIVATE_DER)
 
 # This is the same private key, as a point in uncompressed form. This should
 # be Base64url-encoded without padding.
-T_RAW = """
+TEST_KEY_PRIVATE_RAW = """
 943WICKkdu3z78pnY0gXw143biOoCacwsVkQyhxjxFs
 """.strip().encode('utf8')
 
 # This is a public key in PEM form.
-T_PUBLIC = """-----BEGIN PUBLIC KEY-----
+TEST_KEY_PUBLIC_PEM = """-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEJwJZq/GN8jJbo1GGpyU70hmP2hb
 WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 -----END PUBLIC KEY-----
@@ -43,7 +43,7 @@ WAUpQFKDByKB81yldJ9GTklBM5xqEwuPM7VuQcyiLDhvovthPIXx+gsQRQ==
 
 # this is a public key in uncompressed form ('\x04' + 2 * 32 octets)
 # Remember, this should have any padding stripped.
-T_PUBLIC_RAW = (
+TEST_KEY_PUBLIC_RAW = (
     "BBCcCWavxjfIyW6NRhqclO9IZj9oW1gFKUBSgwcigfNc"
     "pXSfRk5JQTOcahMLjzO1bkHMoiw4b6L7YTyF8foLEEU"
     ).strip('=').encode('utf8')
@@ -51,11 +51,11 @@ T_PUBLIC_RAW = (
 
 def setUp(self):
     with open('/tmp/private', 'w') as ff:
-        ff.write(T_PRIVATE)
+        ff.write(TEST_KEY_PRIVATE_PEM)
     with open('/tmp/public', 'w') as ff:
-        ff.write(T_PUBLIC)
+        ff.write(TEST_KEY_PUBLIC_PEM)
     with open('/tmp/private.der', 'w') as ff:
-        ff.write(T_DER)
+        ff.write(TEST_KEY_PRIVATE_DER)
 
 
 def tearDown(self):
@@ -72,9 +72,9 @@ class VapidTestCase(unittest.TestCase):
     def test_init(self):
         v1 = Vapid01.from_file("/tmp/private")
         self.check_keys(v1)
-        v2 = Vapid01.from_pem(T_PRIVATE.encode())
+        v2 = Vapid01.from_pem(TEST_KEY_PRIVATE_PEM.encode())
         self.check_keys(v2)
-        v3 = Vapid01.from_der(T_DER.encode())
+        v3 = Vapid01.from_der(TEST_KEY_PRIVATE_DER.encode())
         self.check_keys(v3)
         v4 = Vapid01.from_file("/tmp/private.der")
         self.check_keys(v4)
@@ -121,22 +121,22 @@ class VapidTestCase(unittest.TestCase):
         os.unlink("/tmp/p2")
 
     def test_from_raw(self):
-        v = Vapid01.from_raw(T_RAW)
+        v = Vapid01.from_raw(TEST_KEY_PRIVATE_RAW)
         self.check_keys(v)
 
     def test_from_string(self):
-        v1 = Vapid01.from_string(T_DER)
-        v2 = Vapid01.from_string(T_RAW.decode())
+        v1 = Vapid01.from_string(TEST_KEY_PRIVATE_DER)
+        v2 = Vapid01.from_string(TEST_KEY_PRIVATE_RAW.decode())
         self.check_keys(v1)
         self.check_keys(v2)
 
     def test_sign_01(self):
-        v = Vapid01.from_string(T_DER)
+        v = Vapid01.from_string(TEST_KEY_PRIVATE_DER)
         claims = {"aud": "https://example.com",
                   "sub": "mailto:admin@example.com"}
         result = v.sign(claims, "id=previous")
         eq_(result['Crypto-Key'],
-            'id=previous;p256ecdsa=' + T_PUBLIC_RAW.decode('utf8'))
+            'id=previous;p256ecdsa=' + TEST_KEY_PUBLIC_RAW.decode('utf8'))
         pkey = binascii.b2a_base64(
             v.public_key.public_bytes(
                 serialization.Encoding.X962,
@@ -148,7 +148,7 @@ class VapidTestCase(unittest.TestCase):
             eq_(items[k], claims[k])
         result = v.sign(claims)
         eq_(result['Crypto-Key'],
-            'p256ecdsa=' + T_PUBLIC_RAW.decode('utf8'))
+            'p256ecdsa=' + TEST_KEY_PUBLIC_RAW.decode('utf8'))
         # Verify using the same function as Integration
         # this should ensure that the r,s sign values are correctly formed
         ok_(Vapid01.verify(
