@@ -83,5 +83,5 @@ def sign(claims, key):
     token = "{}.{}".format(header, claims)
     rsig = key.sign(token.encode('utf8'), ec.ECDSA(hashes.SHA256()))
     (r, s) = utils.decode_dss_signature(rsig)
-    sig = b64urlencode(num_to_bytes(r) + num_to_bytes(s))
+    sig = b64urlencode(num_to_bytes(r, 32) + num_to_bytes(s, 32))
     return "{}.{}".format(token, sig)
