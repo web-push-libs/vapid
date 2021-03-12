@@ -110,6 +110,7 @@ class Vapid01(object):
 
         """
         if not os.path.isfile(private_key_file):
+            logging.info("Private key not found, generating key...")
             vapid = cls()
             vapid.generate_keys()
             vapid.save_key(private_key_file)

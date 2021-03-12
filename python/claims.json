@@ -1,6 +1,5 @@
 {
  "sub": "mailto:admin@example.com",
- "aud": "https://push.services.mozilla.com",
- "exp": "1463001340"
+ "aud": "https://push.services.mozilla.com"
 }
 

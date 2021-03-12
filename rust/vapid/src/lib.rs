@@ -30,11 +30,7 @@
 //!
 //! ```
 
-extern crate base64;
-extern crate failure;
-extern crate openssl;
-extern crate serde_json;
-extern crate time;
+use std::time::SystemTime;
 
 use std::collections::HashMap;
 use std::fs;
@@ -170,6 +166,12 @@ fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
 // Preferred schema
 static SCHEMA: &str = "vapid";
 
+fn to_secs(t: SystemTime) -> u64 {
+    t.duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 /// Convert the HashMap containing the claims into an Authorization header.
 /// `key` must be generated or initialized before this is used. See `Key::from_pem()` or
 /// `Key::generate()`.
@@ -194,21 +196,21 @@ pub fn sign<S: BuildHasher>(
             return Err(error::VapidErrorKind::VapidError("'sub' not found".to_owned()).into());
         }
     }
-    let today = time::now_utc();
+    let today = SystemTime::now();
     let tomorrow = today + time::Duration::hours(24);
     claims
         .entry(String::from("exp"))
-        .or_insert_with(|| serde_json::Value::from(tomorrow.to_timespec().sec));
+        .or_insert_with(|| serde_json::Value::from(to_secs(tomorrow)));
     match claims.get("exp") {
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
-            if exp_val < today.to_timespec().sec {
+            if (exp_val as u64) < to_secs(today) {
                 return Err(error::VapidErrorKind::VapidError(
                     r#""exp" already expired"#.to_owned(),
                 )
                 .into());
             }
-            if exp_val > tomorrow.to_timespec().sec {
+            if (exp_val as u64) > to_secs(tomorrow) {
                 return Err(error::VapidErrorKind::VapidError(
                     r#""exp" set too far ahead"#.to_owned(),
                 )
@@ -273,7 +275,7 @@ pub fn sign<S: BuildHasher>(
 
     let auth_t = format!(
         "{}.{}",
-        content.clone(),
+        content,
         base64::encode_config(
             unsafe { &String::from_utf8_unchecked(sigval) },
             base64::URL_SAFE_NO_PAD,
@@ -289,7 +291,7 @@ pub fn sign<S: BuildHasher>(
 pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
     //Verify that the auth token string matches for the verification token string
     let auth_token =
-        parse_auth_token(&auth_token.clone()).expect("Authorization header is invalid.");
+        parse_auth_token(&auth_token).expect("Authorization header is invalid.");
     let pub_ec_key =
         Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");
     let pub_key = &match PKey::from_ec_key(pub_ec_key) {
@@ -487,5 +489,4 @@ mod tests {
     }
 
     //TODO: Add key input/output tests here.
-
 }
