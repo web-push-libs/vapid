@@ -1,4 +1,3 @@
-`PyPI version py_vapid <https://pypi.org/project/py-vapid/>`__
 
 Easy VAPID generation
 =====================
@@ -95,3 +94,6 @@ that some User Agents may require you `to decode this string into a
 Uint8Array <https://github.com/GoogleChrome/push-notifications/blob/master/app/scripts/main.js>`__.
 
 See ``bin/vapid -h`` for all options and commands.
+
+.. |PyPI version py_vapid| image:: https://badge.fury.io/py/py-vapid.svg
+   :target: https://pypi.org/project/py-vapid/

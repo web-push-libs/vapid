@@ -5,7 +5,6 @@ import os
 import json
 import unittest
 from cryptography.hazmat.primitives import serialization
-from nose.tools import eq_, ok_
 from mock import patch, Mock
 
 from py_vapid import Vapid01, Vapid02, VapidException
@@ -49,7 +48,7 @@ TEST_KEY_PUBLIC_RAW = (
     ).strip('=').encode('utf8')
 
 
-def setUp(self):
+def setup_module(self):
     with open('/tmp/private', 'w') as ff:
         ff.write(TEST_KEY_PRIVATE_PEM)
     with open('/tmp/public', 'w') as ff:
@@ -58,16 +57,16 @@ def setUp(self):
         ff.write(TEST_KEY_PRIVATE_DER)
 
 
-def tearDown(self):
+def teardown_module(self):
     os.unlink('/tmp/private')
     os.unlink('/tmp/public')
 
 
 class VapidTestCase(unittest.TestCase):
     def check_keys(self, v):
-        eq_(v.private_key.private_numbers().private_value, key.get('d'))
-        eq_(v.public_key.public_numbers().x, key.get('x'))
-        eq_(v.public_key.public_numbers().y, key.get('y'))
+        assert v.private_key.private_numbers().private_value == key.get('d')
+        assert v.public_key.public_numbers().x == key.get('x')
+        assert v.public_key.public_numbers().y == key.get('y')
 
     def test_init(self):
         v1 = Vapid01.from_file("/tmp/private")
@@ -80,7 +79,7 @@ class VapidTestCase(unittest.TestCase):
         self.check_keys(v4)
         no_exist = '/tmp/not_exist'
         Vapid01.from_file(no_exist)
-        ok_(os.path.isfile(no_exist))
+        assert os.path.isfile(no_exist)
         os.unlink(no_exist)
 
     def repad(self, data):
@@ -95,8 +94,8 @@ class VapidTestCase(unittest.TestCase):
     def test_gen_key(self):
         v = Vapid01()
         v.generate_keys()
-        ok_(v.public_key)
-        ok_(v.private_key)
+        assert v.public_key
+        assert v.private_key
 
     def test_private_key(self):
         v = Vapid01()
@@ -105,8 +104,8 @@ class VapidTestCase(unittest.TestCase):
 
     def test_public_key(self):
         v = Vapid01()
-        eq_(v._private_key, None)
-        eq_(v._public_key, None)
+        assert v._private_key is None
+        assert v._public_key is None
 
     def test_save_key(self):
         v = Vapid01()
@@ -135,7 +134,7 @@ class VapidTestCase(unittest.TestCase):
         claims = {"aud": "https://example.com",
                   "sub": "mailto:admin@example.com"}
         result = v.sign(claims, "id=previous")
-        eq_(result['Crypto-Key'],
+        assert result['Crypto-Key'] == (
             'id=previous;p256ecdsa=' + TEST_KEY_PUBLIC_RAW.decode('utf8'))
         pkey = binascii.b2a_base64(
             v.public_key.public_bytes(
@@ -145,16 +144,16 @@ class VapidTestCase(unittest.TestCase):
         ).decode('utf8').replace('+', '-').replace('/', '_').strip()
         items = decode(result['Authorization'].split(' ')[1], pkey)
         for k in claims:
-            eq_(items[k], claims[k])
+            assert items[k] == claims[k]
         result = v.sign(claims)
-        eq_(result['Crypto-Key'],
-            'p256ecdsa=' + TEST_KEY_PUBLIC_RAW.decode('utf8'))
+        assert result['Crypto-Key'] == ('p256ecdsa=' +
+            TEST_KEY_PUBLIC_RAW.decode('utf8'))
         # Verify using the same function as Integration
         # this should ensure that the r,s sign values are correctly formed
-        ok_(Vapid01.verify(
+        assert Vapid01.verify(
             key=result['Crypto-Key'].split('=')[1],
             auth=result['Authorization']
-        ))
+        )
 
     def test_sign_02(self):
         v = Vapid02.from_file("/tmp/private")
@@ -164,20 +163,20 @@ class VapidTestCase(unittest.TestCase):
         claim_check = copy.deepcopy(claims)
         result = v.sign(claims, "id=previous")
         auth = result['Authorization']
-        eq_(auth[:6], 'vapid ')
-        ok_(' t=' in auth)
-        ok_(',k=' in auth)
+        assert auth[:6] == 'vapid '
+        assert ' t=' in auth
+        assert ',k=' in auth
         parts = auth[6:].split(',')
-        eq_(len(parts), 2)
+        assert len(parts) == 2
         t_val = json.loads(base64.urlsafe_b64decode(
             self.repad(parts[0][2:].split('.')[1])
         ).decode('utf8'))
         k_val = binascii.a2b_base64(self.repad(parts[1][2:]))
-        eq_(binascii.hexlify(k_val)[:2], b'04')
-        eq_(len(k_val), 65)
-        eq_(claims, claim_check)
+        assert binascii.hexlify(k_val)[:2] == b'04'
+        assert len(k_val) == 65
+        assert claims == claim_check
         for k in claims:
-            eq_(t_val[k], claims[k])
+            assert t_val[k] == claims[k]
 
     def test_sign_02_localhost(self):
         v = Vapid02.from_file("/tmp/private")
@@ -186,9 +185,9 @@ class VapidTestCase(unittest.TestCase):
                   "foo": "extra value"}
         result = v.sign(claims, "id=previous")
         auth = result['Authorization']
-        eq_(auth[:6], 'vapid ')
-        ok_(' t=' in auth)
-        ok_(',k=' in auth)
+        assert auth[:6] == 'vapid '
+        assert ' t=' in auth
+        assert ',k=' in auth
 
     def test_integration(self):
         # These values were taken from a test page. DO NOT ALTER!
@@ -199,8 +198,8 @@ class VapidTestCase(unittest.TestCase):
                 "4cCI6MTQ5NDY3MTQ3MCwic3ViIjoibWFpbHRvOnNpbXBsZS1wdXNoLWRlb"
                 "W9AZ2F1bnRmYWNlLmNvLnVrIn0.LqPi86T-HJ71TXHAYFptZEHD7Wlfjcc"
                 "4u5jYZ17WpqOlqDcW-5Wtx3x1OgYX19alhJ9oLumlS2VzEvNioZolQA")
-        ok_(Vapid01.verify(key=key, auth="webpush {}".format(auth)))
-        ok_(Vapid02.verify(auth="vapid t={},k={}".format(auth, key)))
+        assert Vapid01.verify(key=key, auth="webpush {}".format(auth))
+        assert Vapid02.verify(auth="vapid t={},k={}".format(auth, key))
 
     def test_bad_integration(self):
         # These values were taken from a test page. DO NOT ALTER!
@@ -211,7 +210,7 @@ class VapidTestCase(unittest.TestCase):
                 "4cCI6MTQ5NDY3MTQ3MCwic3ViIjoibWFpbHRvOnNpbXBsZS1wdXNoLWRlb"
                 "W9AZ2F1bnRmYWNlLmNvLnVrIn0.LqPi86T-HJ71TXHAYFptZEHD7Wlfjcc"
                 "4u5jYZ17WpqOlqDcW-5Wtx3x1OgYX19alhJ9oLumlS2VzEvNioZ_BAD")
-        eq_(Vapid01.verify(key=key, auth=auth), False)
+        assert Vapid01.verify(key=key, auth=auth) == False
 
     def test_bad_sign(self):
         v = Vapid01.from_file("/tmp/private")
