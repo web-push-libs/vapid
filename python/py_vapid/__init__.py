@@ -259,7 +259,7 @@ class Vapid01(object):
         cclaims = copy.deepcopy(claims)
         if not cclaims.get('exp'):
             cclaims['exp'] = str(int(time.time()) + 86400)
-        if not re.match(r'mailto:.+@.+\..+',
+        if not re.match(r'mailto:.+@.+',
                         cclaims.get('sub', ''),
                         re.IGNORECASE):
             raise VapidException(
