@@ -7,7 +7,7 @@ import unittest
 from cryptography.hazmat.primitives import serialization
 from mock import patch, Mock
 
-from py_vapid import Vapid01, Vapid02, VapidException
+from py_vapid import Vapid01, Vapid02, VapidException, _check_sub
 from py_vapid.jwt import decode
 
 TEST_KEY_PRIVATE_DER = """
@@ -228,7 +228,12 @@ class VapidTestCase(unittest.TestCase):
         self.assertRaises(VapidException,
                           v.sign,
                           {'sub': 'mailto:foo@bar.com',
-                              'aud': "https://p.example.com:8080/"})
+                           'aud': "https://p.example.com:8080/"})
+
+    def test_ignore_sub(self):
+        v = Vapid02.from_file("/tmp/private")
+        v.conf['no-strict'] = True
+        assert v.sign({"sub": "foo", "aud": "http://localhost:8000"})
 
     @patch('cryptography.hazmat.primitives.asymmetric'
            '.ec.EllipticCurvePublicNumbers')
@@ -247,3 +252,29 @@ class VapidTestCase(unittest.TestCase):
                           decode,
                           'foo.bar.a',
                           'aaaa')
+
+    def test_sub(self):
+        valid = [
+            'mailto:me@localhost',
+            'mailto:me@1.2.3.4',
+            'mailto:me@1234::',
+            'mailto:me@1234::5678',
+            'mailto:admin@example.org',
+            'https://localhost',
+            'https://8001::',
+            'https://8001:1000:0001',
+            'https://1.2.3.4'
+        ]
+        invalid = [
+            'mailto:@foobar.com',
+            'mailto:example.org',
+            'mailto:0123:',
+            'mailto:::1234',
+            'https://somehost',
+            'https://xyz:123',
+        ]
+
+        for val in valid:
+            assert _check_sub(val) is True
+        for val in invalid:
+            assert _check_sub(val) is False
