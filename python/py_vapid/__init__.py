@@ -38,13 +38,16 @@ class Vapid01(object):
     _public_key = None
     _schema = "WebPush"
 
-    def __init__(self, private_key=None):
+    def __init__(self, private_key=None, conf=None):
         """Initialize VAPID with an optional private key.
 
         :param private_key: A private key object
         :type private_key: ec.EllipticCurvePrivateKey
 
         """
+        if conf is None:
+            conf = {}
+        self.conf = conf
         self.private_key = private_key
         if private_key:
             self._public_key = self.private_key.public_key()
@@ -259,9 +262,11 @@ class Vapid01(object):
         cclaims = copy.deepcopy(claims)
         if not cclaims.get('exp'):
             cclaims['exp'] = str(int(time.time()) + 86400)
-        if not re.match(r'mailto:.+@.+\..+',
-                        cclaims.get('sub', ''),
-                        re.IGNORECASE):
+        if not self.conf.get('no-strict', False):
+            valid = _check_sub(cclaims.get('sub', ''))
+        else:
+            valid = cclaims.get('sub') is not None
+        if not valid:
             raise VapidException(
                 "Missing 'sub' from claims. "
                 "'sub' is your admin email as a mailto: link.")
@@ -344,6 +349,12 @@ class Vapid02(Vapid01):
             validation_token=tokens[0].encode(),
             verification_token=tokens[1]
         )
+
+def _check_sub(sub):
+    pattern =(
+        r"^(mailto:.+@((localhost|[%\w]+(\.[%\w]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|\w+\.[\w\.]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$"
+        )
+    return re.match(pattern, sub, re.IGNORECASE) is not None
 
 
 Vapid = Vapid02

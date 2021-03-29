@@ -31,6 +31,8 @@ def main():
                         default=False, action="store_true")
     parser.add_argument('--json',  help="dump as json",
                         default=False, action="store_true")
+    parser.add_argumet('--no-strict', help='Do not be strict about "sub"',
+                        default=False, action="store_true")
     parser.add_argument('--applicationServerKey',
                         help="show applicationServerKey value",
                         default=False, action="store_true")
@@ -52,7 +54,7 @@ def main():
                 if answer == 'n':
                     print("Sorry, can't do much for you then.")
                     exit(1)
-        vapid = Vapid()
+        vapid = Vapid(conf=args)
         vapid.generate_keys()
         print("Generating private_key.pem")
         vapid.save_key('private_key.pem')
