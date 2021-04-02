@@ -85,8 +85,12 @@ for more details. Be aware that this value is tied to the generated
 public/private key. If you remove or generate a new key, any
 restricted URL you've previously generated will need to be
 reallocated. Please note that some User Agents may require you [to
-decode this string into a Uint8Array](https://github.com/GoogleChrome/push-notifications/blob/master/app/scripts/main.js). 
+decode this string into a Uint8Array](https://github.com/GoogleChrome/push-notifications/blob/master/app/scripts/main.js).
 
 See `bin/vapid -h` for all options and commands.
 
+## CHANGELOG
 
+I'm terrible about updating the Changelog. Please see the [`git
+log`](https://github.com/web-push-libs/vapid/pulls?q=is%3Apr+is%3Aclosed)
+history for details.

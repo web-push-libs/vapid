@@ -3,7 +3,7 @@ import os
 
 from setuptools import setup, find_packages
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 
 def read_from(file):
@@ -44,7 +44,7 @@ setup(name="py-vapid",
       include_package_data=True,
       zip_safe=False,
       packages=find_packages(),
-      package_data={'': ['README.rst', 'CHANGELOG.rst',
+      package_data={'': ['README.rst',
                          'requirements.txt', 'test-requirements.txt']},
       install_requires=read_from('requirements.txt'),
       tests_require=read_from('test-requirements.txt'),
