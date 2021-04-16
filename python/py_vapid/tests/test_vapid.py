@@ -260,7 +260,9 @@ class VapidTestCase(unittest.TestCase):
             'mailto:me@1234::',
             'mailto:me@1234::5678',
             'mailto:admin@example.org',
+            'mailto:admin-test-case@example-test-case.test.org',
             'https://localhost',
+            'https://exmample-test-case.test.org',
             'https://8001::',
             'https://8001:1000:0001',
             'https://1.2.3.4'

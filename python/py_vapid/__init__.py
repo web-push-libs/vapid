@@ -352,7 +352,7 @@ class Vapid02(Vapid01):
 
 def _check_sub(sub):
     pattern =(
-        r"^(mailto:.+@((localhost|[%\w]+(\.[%\w]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|\w+\.[\w\.]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$"
+        r"^(mailto:.+@((localhost|[%\w-]+(\.[%\w-]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|[\w-]+\.[\w\.-]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$"
         )
     return re.match(pattern, sub, re.IGNORECASE) is not None
 
