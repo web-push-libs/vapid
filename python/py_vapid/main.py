@@ -31,7 +31,7 @@ def main():
                         default=False, action="store_true")
     parser.add_argument('--json',  help="dump as json",
                         default=False, action="store_true")
-    parser.add_argumet('--no-strict', help='Do not be strict about "sub"',
+    parser.add_argument('--no-strict', help='Do not be strict about "sub"',
                         default=False, action="store_true")
     parser.add_argument('--applicationServerKey',
                         help="show applicationServerKey value",
