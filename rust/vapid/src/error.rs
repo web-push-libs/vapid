@@ -15,11 +15,11 @@ pub struct VapidError {
 #[derive(Clone, Eq, PartialEq, Debug, Fail)]
 pub enum VapidErrorKind {
     #[fail(display = "Invalid public key")]
-    PublicKeyError,
+    PublicKey,
     #[fail(display = "VAPID error: {}", _0)]
-    VapidError(String),
+    Protocol(String),
     #[fail(display = "Internal Error {:?}", _0)]
-    InternalError(String),
+    Internal(String),
 }
 
 impl Fail for VapidError {
@@ -52,6 +52,6 @@ impl From<Context<VapidErrorKind>> for VapidError {
 
 impl From<Error> for VapidError {
     fn from(err: Error) -> VapidError {
-        VapidErrorKind::InternalError(format!("Error: {:?}", err)).into()
+        VapidErrorKind::Internal(format!("Error: {:?}", err)).into()
     }
 }

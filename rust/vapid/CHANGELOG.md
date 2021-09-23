@@ -1,3 +1,9 @@
+# 0.4.0
+
+* Changed `VapidErrors` to be more Clippy friendly
+* updates for latest rust
+
+
 # 0.2.0
 
 Due to changes in the OpenSSL library, several calls changed form from `0.1.0`
