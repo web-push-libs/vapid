@@ -112,7 +112,7 @@ impl Key {
         let group = ec::EcGroup::from_curve_name(nid::Nid::X9_62_PRIME256V1)?;
         if bytes.len() != 65 || bytes[0] != 4 {
             // It's not a properly tagged key.
-            return Err(error::VapidErrorKind::PublicKeyError.into());
+            return Err(error::VapidErrorKind::PublicKey.into());
         }
         let point = ec::EcPoint::from_bytes(&group, &bytes, &mut ctx)?;
         Ok(ec::EcKey::from_public_key(&group, &point)?)
@@ -186,14 +186,14 @@ pub fn sign<S: BuildHasher>(
     match claims.get("sub") {
         Some(sub) => {
             if !sub.as_str().unwrap().starts_with("mailto") {
-                return Err(error::VapidErrorKind::VapidError(
+                return Err(error::VapidErrorKind::Protocol(
                     "'sub' not a valid HTML reference".to_owned(),
                 )
                 .into());
             }
         }
         None => {
-            return Err(error::VapidErrorKind::VapidError("'sub' not found".to_owned()).into());
+            return Err(error::VapidErrorKind::Protocol("'sub' not found".to_owned()).into());
         }
     }
     let today = SystemTime::now();
@@ -205,13 +205,13 @@ pub fn sign<S: BuildHasher>(
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
             if (exp_val as u64) < to_secs(today) {
-                return Err(error::VapidErrorKind::VapidError(
+                return Err(error::VapidErrorKind::Protocol(
                     r#""exp" already expired"#.to_owned(),
                 )
                 .into());
             }
             if (exp_val as u64) > to_secs(tomorrow) {
-                return Err(error::VapidErrorKind::VapidError(
+                return Err(error::VapidErrorKind::Protocol(
                     r#""exp" set too far ahead"#.to_owned(),
                 )
                 .into());
@@ -219,7 +219,7 @@ pub fn sign<S: BuildHasher>(
         }
         None => {
             // We already do an insertion on empty, so this should never trigger.
-            return Err(error::VapidErrorKind::VapidError(
+            return Err(error::VapidErrorKind::Protocol(
                 r#""exp" failed to initialize"#.to_owned(),
             )
             .into());
@@ -238,7 +238,7 @@ pub fn sign<S: BuildHasher>(
     let mut signer = match Signer::new(MessageDigest::sha256(), &pub_key) {
         Ok(t) => t,
         Err(err) => {
-            return Err(error::VapidErrorKind::VapidError(format!(
+            return Err(error::VapidErrorKind::Protocol(format!(
                 "Could not sign the claims: {:?}",
                 err
             ))
@@ -290,8 +290,7 @@ pub fn sign<S: BuildHasher>(
 
 pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
     //Verify that the auth token string matches for the verification token string
-    let auth_token =
-        parse_auth_token(&auth_token).expect("Authorization header is invalid.");
+    let auth_token = parse_auth_token(&auth_token).expect("Authorization header is invalid.");
     let pub_ec_key =
         Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");
     let pub_key = &match PKey::from_ec_key(pub_ec_key) {
@@ -401,18 +400,18 @@ mod tests {
         assert!(result.contains(" vapid "));
 
         // tear apart the auth token for the happy bits
-        let token = result.split(" ").nth(2).unwrap();
-        let sub_parts: Vec<&str> = token.split(",").collect();
+        let token = result.split(' ').nth(2).unwrap();
+        let sub_parts: Vec<&str> = token.split(',').collect();
         let mut auth_parts: HashMap<String, String> = HashMap::new();
         for kvi in &sub_parts {
-            let kv: Vec<String> = kvi.splitn(2, "=").map(|x| String::from(x)).collect();
+            let kv: Vec<String> = kvi.splitn(2, '=').map(String::from).collect();
             auth_parts.insert(kv[0].clone(), kv[1].clone());
         }
         assert!(auth_parts.contains_key("t"));
         assert!(auth_parts.contains_key("k"));
 
         // now tear apart the token
-        let token: Vec<&str> = auth_parts.get("t").unwrap().split(".").collect();
+        let token: Vec<&str> = auth_parts.get("t").unwrap().split('.').collect();
         assert_eq!(token.len(), 3);
 
         let content =
