@@ -1,6 +1,6 @@
 [package]
 name = "vapid"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["jrconlin <jconlin+git@mozilla.com>"]
 edition = "2018"
 description = "An implementation of the RFC 8292 Voluntary Application Server Identification (VAPID) Auth header generator"
@@ -8,8 +8,9 @@ repository = "https://github.com/web-push-libs/vapid"
 license = "MPL 2.0"
 
 [dependencies]
+backtrace="0.3"
 openssl = "0.10"
 serde_json = "1.0"
 base64 = "0.13"
 time = "0.3"
-failure = "0.1"
+thiserror = "1.0"

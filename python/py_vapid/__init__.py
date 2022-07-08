@@ -317,6 +317,17 @@ class Vapid02(Vapid01):
     _schema = "vapid"
 
     def sign(self, claims, crypto_key=None):
+        """Generate an authorization token
+
+        :param claims: JSON object containing the JWT claims to use.
+        :type claims: dict
+        :param crypto_key: Optional existing crypto_key header content. The
+            vapid public key will be appended to this data.
+        :type crypto_key: str
+        :returns: a hash containing the header fields to use in
+            the subscription update.
+        :rtype: dict
+        """
         sig = sign(self._base_sign(claims), self.private_key)
         pkey = self.public_key.public_bytes(
                 serialization.Encoding.X962,
@@ -332,6 +343,13 @@ class Vapid02(Vapid01):
 
     @classmethod
     def verify(cls, auth):
+        """Ensure that the token is correctly formatted and valid
+
+        :param auth: An Authorization header
+        :type auth: str
+        :rtype: bool
+
+        """
         pref_tok = auth.rsplit(' ', 1)
         assert pref_tok[0].lower() == cls._schema, (
                 "Incorrect schema specified")
@@ -350,9 +368,23 @@ class Vapid02(Vapid01):
             verification_token=tokens[1]
         )
 
+
 def _check_sub(sub):
-    pattern =(
-        r"^(mailto:.+@((localhost|[%\w-]+(\.[%\w-]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|[\w-]+\.[\w\.-]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$"
+    """ Check to see if the `sub` is a properly formatted `mailto:`
+
+    a `mailto:` should be a SMTP mail address. Mind you, since I run
+    YouFailAtEmail.com, you have every right to yell about how terrible
+    this check is. I really should be doing a proper component parse
+    and valiate each component individually per RFC5341, instead I do
+    the unholy regex you see below.
+
+    :param sub: Candidate JWT `sub`
+    :type sub: str
+    :rtype: bool
+
+    """
+    pattern = (
+        r"^(mailto:.+@((localhost|[%\w-]+(\.[%\w-]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|[\w-]+\.[\w\.-]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$" # noqa
         )
     return re.match(pattern, sub, re.IGNORECASE) is not None
 
