@@ -261,7 +261,7 @@ class Vapid01(object):
     def _base_sign(self, claims):
         cclaims = copy.deepcopy(claims)
         if not cclaims.get('exp'):
-            cclaims['exp'] = str(int(time.time()) + 86400)
+            cclaims['exp'] = int(time.time()) + 86400
         if not self.conf.get('no-strict', False):
             valid = _check_sub(cclaims.get('sub', ''))
         else:
