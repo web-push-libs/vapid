@@ -1,6 +1,12 @@
+# Easy VAPID generation
+
 [![PyPI version py_vapid](https://badge.fury.io/py/py-vapid.svg)](https://pypi.org/project/py-vapid/)
 
-# Easy VAPID generation
+This library is available on [pypi as py-vapid](https://pypi.python.org/pypi/py-vapid).
+Source is available on [github](https://github.com/mozilla-services/vapid).
+Please note: This library was designated as a `Critical Project` by PyPi, it is currently
+maintained by [a single person](https://xkcd.com/2347/). I still accept PRs and Issues, but
+make of that what you will.
 
 This minimal library contains the minimal set of functions you need to
 generate a VAPID key set and get the headers you'll need to sign a
@@ -15,9 +21,11 @@ required fields, one semi-optional and several optional additional
 fields.
 
 At a minimum a VAPID claim set should look like:
-```
+
+```json
 {"sub":"mailto:YourEmail@YourSite.com","aud":"https://PushServer","exp":"ExpirationTimestamp"}
 ```
+
 A few notes:
 
 ***sub*** is the email address you wish to have on record for this
@@ -56,11 +64,13 @@ app, `bin/vapid`.
 You'll need `python virtualenv` Run that in the current directory.
 
 Then run
-```
+
+```python
 bin/pip install -r requirements.txt
 
 bin/python setup.py install
 ```
+
 ## App Usage
 
 Run by itself, `bin/vapid` will check and optionally create the

@@ -1,57 +1,76 @@
 // Error handling based on the failure crate
 
+use std::error::Error;
 use std::fmt;
 use std::result;
 
-use failure::{Backtrace, Context, Error, Fail};
+use backtrace::Backtrace;
+use thiserror::Error;
 
-pub type VapidResult<T> = result::Result<T, Error>;
+pub type VapidResult<T> = result::Result<T, VapidError>;
 
 #[derive(Debug)]
 pub struct VapidError {
-    inner: Context<VapidErrorKind>,
+    kind: VapidErrorKind,
+    pub backtrace: Backtrace,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum VapidErrorKind {
-    #[fail(display = "Invalid public key")]
+    /// General IO instance. Can be returned for bad files or key data.
+    #[error("IO error: {:?}", .0)]
+    File(#[from] std::io::Error),
+    /// OpenSSL errors. These tend not to be very specific (or helpful).
+    #[error("OpenSSL error: {:?}", .0)]
+    OpenSSL(#[from] openssl::error::ErrorStack),
+    /// JSON parsing error.
+    #[error("JSON error:{:?}", .0)]
+    Json(#[from] serde_json::Error),
+
+    /// An invalid public key was specified. Is it EC Prime256v1?
+    #[error("Invalid public key")]
     PublicKey,
-    #[fail(display = "VAPID error: {}", _0)]
+    /// A vapid error occurred.
+    #[error("VAPID error: {}", .0)]
     Protocol(String),
-    #[fail(display = "Internal Error {:?}", _0)]
+    /// A random internal error
+    #[error("Internal Error {:?}", .0)]
     Internal(String),
 }
 
-impl Fail for VapidError {
-    fn cause(&self) -> Option<&dyn Fail> {
-        self.inner.cause()
+/// VapidErrors are the general error wrapper that we use. These include
+/// a public `backtrace` which can be combined with your own because they're
+/// stupidly useful.
+impl VapidError {
+    pub fn kind(&self) -> &VapidErrorKind {
+        &self.kind
     }
 
-    fn backtrace(&self) -> Option<&Backtrace> {
-        self.inner.backtrace()
+    pub fn internal(msg: &str) -> Self {
+        VapidErrorKind::Internal(msg.to_owned()).into()
+    }
+}
+
+impl<T> From<T> for VapidError
+where
+    VapidErrorKind: From<T>,
+{
+    fn from(item: T) -> Self {
+        VapidError {
+            kind: VapidErrorKind::from(item),
+            backtrace: Backtrace::new(),
+        }
+    }
+}
+
+impl Error for VapidError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.kind.source()
     }
 }
 
 impl fmt::Display for VapidError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.inner, f)
-    }
-}
-
-impl From<VapidErrorKind> for VapidError {
-    fn from(kind: VapidErrorKind) -> VapidError {
-        Context::new(kind).into()
-    }
-}
-
-impl From<Context<VapidErrorKind>> for VapidError {
-    fn from(inner: Context<VapidErrorKind>) -> VapidError {
-        VapidError { inner }
-    }
-}
-
-impl From<Error> for VapidError {
-    fn from(err: Error) -> VapidError {
-        VapidErrorKind::Internal(format!("Error: {:?}", err)).into()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
     }
 }

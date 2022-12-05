@@ -45,20 +45,24 @@ use openssl::pkey::{PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
 
 mod error;
-pub struct Key {
-    key: EcKey<Private>,
-}
 
 /// a Key is a helper for creating or using a VAPID EC key.
 ///
 /// Vapid Keys are always Prime256v1 EC keys.
 ///
+pub struct Key {
+    key: EcKey<Private>,
+}
+
 impl Key {
+    /// return the name of the key.
+    /// It's always going to be this static value (for now).
+    /// Eventually it might be "Kevin", but let's not dwell on that.
     fn name() -> nid::Nid {
         nid::Nid::X9_62_PRIME256V1
     }
 
-    /// Read a VAPID private key stored in `path`
+    /// Read a VAPID private key in PEM format stored in `path`
     pub fn from_pem<P>(path: P) -> error::VapidResult<Key>
     where
         P: AsRef<Path>,
@@ -119,9 +123,12 @@ impl Key {
     }
 }
 
+/// The elements of the Authentication.
 #[derive(Debug)]
 struct AuthElements {
+    /// the unjoined JWT components
     t: Vec<String>,
+    /// the public verification key
     k: String,
 }
 
@@ -205,10 +212,9 @@ pub fn sign<S: BuildHasher>(
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
             if (exp_val as u64) < to_secs(today) {
-                return Err(error::VapidErrorKind::Protocol(
-                    r#""exp" already expired"#.to_owned(),
-                )
-                .into());
+                return Err(
+                    error::VapidErrorKind::Protocol(r#""exp" already expired"#.to_owned()).into(),
+                );
             }
             if (exp_val as u64) > to_secs(tomorrow) {
                 return Err(error::VapidErrorKind::Protocol(
@@ -288,8 +294,8 @@ pub fn sign<S: BuildHasher>(
     ))
 }
 
+/// Verify that the auth token string matches for the verification token string
 pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
-    //Verify that the auth token string matches for the verification token string
     let auth_token = parse_auth_token(&auth_token).expect("Authorization header is invalid.");
     let pub_ec_key =
         Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");

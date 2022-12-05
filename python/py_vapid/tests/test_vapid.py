@@ -146,8 +146,8 @@ class VapidTestCase(unittest.TestCase):
         for k in claims:
             assert items[k] == claims[k]
         result = v.sign(claims)
-        assert result['Crypto-Key'] == ('p256ecdsa=' +
-            TEST_KEY_PUBLIC_RAW.decode('utf8'))
+        assert result['Crypto-Key'] == (
+            'p256ecdsa=' + TEST_KEY_PUBLIC_RAW.decode('utf8'))
         # Verify using the same function as Integration
         # this should ensure that the r,s sign values are correctly formed
         assert Vapid01.verify(
@@ -210,7 +210,7 @@ class VapidTestCase(unittest.TestCase):
                 "4cCI6MTQ5NDY3MTQ3MCwic3ViIjoibWFpbHRvOnNpbXBsZS1wdXNoLWRlb"
                 "W9AZ2F1bnRmYWNlLmNvLnVrIn0.LqPi86T-HJ71TXHAYFptZEHD7Wlfjcc"
                 "4u5jYZ17WpqOlqDcW-5Wtx3x1OgYX19alhJ9oLumlS2VzEvNioZ_BAD")
-        assert Vapid01.verify(key=key, auth=auth) == False
+        assert not Vapid01.verify(key=key, auth=auth)
 
     def test_bad_sign(self):
         v = Vapid01.from_file("/tmp/private")
