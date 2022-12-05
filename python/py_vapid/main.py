@@ -36,15 +36,17 @@ def main():
     parser.add_argument('--applicationServerKey',
                         help="show applicationServerKey value",
                         default=False, action="store_true")
+    parser.add_argument('--private-key', '-k', help='private key pem file',
+                        default="private_key.pem")
     args = parser.parse_args()
 
     # Added to solve 2.7 => 3.* incompatibility
     Vapid = Vapid02
     if args.version1:
         Vapid = Vapid01
-    if args.gen or not os.path.exists('private_key.pem'):
+    if args.gen or not os.path.exists(args.private_key):
         if not args.gen:
-            print("No private_key.pem file found.")
+            print("No private key file found.")
             answer = None
             while answer not in ['y', 'n']:
                 answer = prompt("Do you want me to create one for you? (Y/n)")
@@ -60,7 +62,7 @@ def main():
         vapid.save_key('private_key.pem')
         print("Generating public_key.pem")
         vapid.save_public_key('public_key.pem')
-    vapid = Vapid.from_file('private_key.pem')
+    vapid = Vapid.from_file(args.private_key)
     claim_file = args.sign
     result = dict()
     if args.applicationServerKey:
