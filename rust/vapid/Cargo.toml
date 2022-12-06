@@ -5,7 +5,7 @@ authors = ["jrconlin <jconlin+git@mozilla.com>"]
 edition = "2021"
 description = "An implementation of the RFC 8292 Voluntary Application Server Identification (VAPID) Auth header generator"
 repository = "https://github.com/web-push-libs/vapid"
-license = "MPL 2.0"
+license = "MPL-2.0"
 
 [dependencies]
 backtrace="0.3"
