@@ -88,7 +88,7 @@ class DERLite{
         };
 
         console.debug(JSON.stringify(jwk));
-        return webCrypto.importKey('jwk', jwk, 'ECDSA', true, key_ops);
+        return webCrypto.importKey('jwk', jwk, {name:'ECDSA', namedCurve: 'P-256'} , true, key_ops);
     }
 
     export_public_der(key) {
@@ -163,7 +163,7 @@ class DERLite{
             y, y
         };
 
-        return webCrypto.importKey('jwk', jwk, 'ECDSA', true, ["verify"])
+        return webCrypto.importKey('jwk', jwk, {name:'ECDSA', namedCurve: 'P-256'}, true, ["verify"])
 
     }
 }
