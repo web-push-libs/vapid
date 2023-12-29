@@ -5,7 +5,12 @@ include/
 lib/
 local/
 man/
+.idea/
+.vscode/
+.coverage/
 *.egg-info
 *.pem
 *.pyc
 .*.sw?
+pip-selfcheck.json
+test/

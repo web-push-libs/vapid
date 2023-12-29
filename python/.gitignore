@@ -1,1 +1,6 @@
 .eggs/
+.idea/
+.vscode/
+.coverage
+foo/
+venv/
