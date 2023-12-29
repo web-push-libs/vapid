@@ -3,10 +3,10 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-dependencies = ["cryptography>=2.5"]
+# dependencies = ["cryptography>=2.5"]
+dynamic = ["version", "description"]
 name = "py-vapid"
 authors = [{ name = "JR Conlin", email = "src+vapidwebpusher@jrconlin.com" }]
-description = "Minimal VAPID RFC8292 signature generation library"
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = ["vapid", "webpush", "notification"]
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-version = "2.0.0"
+
 [project.urls]
 Homepage = "https://github.com/web-push-libs/vapid/tree/main/python"
 

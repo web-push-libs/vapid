@@ -3,7 +3,7 @@ import os
 
 from setuptools import setup, find_namespace_packages
 
-__version__ = "1.9.0"
+__version__ = "2.0.0"
 
 
 def read_from(file):
@@ -29,7 +29,7 @@ with io.open(os.path.join(here, 'README.rst'), encoding='utf8') as f:
 
 setup(name="py-vapid",
       version=__version__,
-      description='Simple VAPID header generation library',
+      description='Minimal VAPID RFC8292 signature generation library',
       long_description=README,
       long_description_content_type="text/x-rst",
       classifiers=["Topic :: Internet :: WWW/HTTP",
