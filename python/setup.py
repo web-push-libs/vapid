@@ -1,7 +1,7 @@
 import io
 import os
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 __version__ = "1.9.0"
 
@@ -43,13 +43,10 @@ setup(name="py-vapid",
       license="MPL2",
       include_package_data=True,
       zip_safe=False,
-      packages=find_packages(),
+      packages=find_namespace_packages(),
       package_data={'': ['README.rst',
                          'requirements.txt', 'test-requirements.txt']},
       install_requires=read_from('requirements.txt'),
       tests_require=read_from('test-requirements.txt'),
-      entry_points="""
-      [console_scripts]
-      vapid = py_vapid.main:main
-      """,
+      # entry_points={"console_scripts": {"vapid": "py_vapid.main:main"}},
       )
