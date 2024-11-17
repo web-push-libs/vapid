@@ -68,7 +68,7 @@ Then run
 ```python
 bin/pip install -r requirements.txt
 
-bin/python setup.py install
+bin/python -m pip install -e .
 ```
 
 ## App Usage
