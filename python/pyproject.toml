@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name        = "py-vapid"
-version     = "1.9.1"
+version     = "1.9.2"
 license     = {text = "MPL-2.0"}
 description = "Simple VAPID header generation library"
 readme      = "README.rst"
