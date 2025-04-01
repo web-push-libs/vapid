@@ -59,8 +59,8 @@ class Vapid01(object):
             conf = Namespace(no_strict=False)
         self.conf = conf
         self.private_key = private_key
-        if self._private_key:
-            self._public_key = self._private_key.public_key()
+        if private_key:
+            self._public_key = private_key.public_key()
 
     @classmethod
     def from_raw(cls, private_raw, conf: None | Namespace = None):
