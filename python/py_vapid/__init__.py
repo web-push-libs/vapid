@@ -8,7 +8,8 @@ import binascii
 import time
 import re
 import copy
-import typing
+
+from typing import cast
 
 from argparse import Namespace
 from cryptography.hazmat.backends import default_backend
@@ -55,11 +56,11 @@ class Vapid01(object):
 
         """
         if conf is None:
-            conf = Namespace()
+            conf = Namespace(no_strict=False)
         self.conf = conf
         self.private_key = private_key
-        if private_key:
-            self._public_key = self.private_key.public_key()
+        if self._private_key:
+            self._public_key = self._private_key.public_key()
 
     @classmethod
     def from_raw(cls, private_raw, conf: None | Namespace = None):
@@ -109,10 +110,15 @@ class Vapid01(object):
         key = serialization.load_der_private_key(
             b64urldecode(private_key), password=None, backend=default_backend()
         )
-        return cls(key, conf=conf)
+        if key is None:
+            raise VapidException("Could not load private key")
+        else:
+            return cls(cast(ec.EllipticCurvePrivateKey, key), conf=conf)
 
     @classmethod
-    def from_file(cls, private_key_file=None, conf: None | Namespace = None):
+    def from_file(
+        cls, private_key_file: str = "private_key.pem", conf: None | Namespace = None
+    ):
         """Initialize VAPID using a file containing a private key in PEM or
         DER format.
 
@@ -190,7 +196,7 @@ class Vapid01(object):
             self._public_key = self.private_key.public_key()
 
     @property
-    def public_key(self):
+    def public_key(self) -> ec.EllipticCurvePublicKey:
         """The VAPID public ECDSA key
 
         The public key is currently read only. Set it via the `.private_key`
@@ -200,11 +206,13 @@ class Vapid01(object):
         :returns ec.EllipticCurvePublicKey
 
         """
+        if not self._public_key:
+            raise VapidException("Public key is undefined.")
         return self._public_key
 
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
-        self.private_key = ec.generate_private_key(ec.SECP256R1, default_backend())
+        self.private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
 
     def private_pem(self):
         return self.private_key.private_bytes(

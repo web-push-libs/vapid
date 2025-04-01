@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "py-vapid"
-version = "1.10.0"
+version = "1.11.0"
 description = "Simple VAPID header generation library"
 authors = ["J-R Conlin <src+vapid@jrconlin.com>"]
 license = "MPL-2.0"
