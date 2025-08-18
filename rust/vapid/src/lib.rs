@@ -50,6 +50,7 @@ mod error;
 ///
 /// Vapid Keys are always Prime256v1 EC keys.
 ///
+#[derive(Clone)]
 pub struct Key {
     key: EcKey<Private>,
 }
