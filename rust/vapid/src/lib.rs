@@ -37,12 +37,15 @@ use std::fs;
 use std::hash::BuildHasher;
 use std::path::Path;
 
+use base64::Engine;
 use openssl::bn::BigNumContext;
 use openssl::ec::{self, EcKey};
 use openssl::hash::MessageDigest;
 use openssl::nid;
 use openssl::pkey::{PKey, Private, Public};
 use openssl::sign::{Signer, Verifier};
+
+use crate::error::{VapidError, VapidErrorKind, VapidResult};
 
 mod error;
 
@@ -64,7 +67,7 @@ impl Key {
     }
 
     /// Read a VAPID private key in PEM format stored in `path`
-    pub fn from_pem<P>(path: P) -> error::VapidResult<Key>
+    pub fn from_pem<P>(path: P) -> VapidResult<Key>
     where
         P: AsRef<Path>,
     {
@@ -75,14 +78,14 @@ impl Key {
     }
 
     /// Write the VAPID private key as a PEM to `path`
-    pub fn to_pem(&self, path: &Path) -> error::VapidResult<()> {
+    pub fn to_pem(&self, path: &Path) -> VapidResult<()> {
         let key_data: Vec<u8> = self.key.private_key_to_pem()?;
-        fs::write(&path, &key_data)?;
+        fs::write(path, &key_data)?;
         Ok(())
     }
 
     /// Create a new Vapid key
-    pub fn generate() -> error::VapidResult<Key> {
+    pub fn generate() -> VapidResult<Key> {
         let group = ec::EcGroup::from_curve_name(Key::name())?;
         let key = ec::EcKey::generate(&group)?;
         Ok(Key { key })
@@ -92,7 +95,7 @@ impl Key {
     pub fn to_private_raw(&self) -> String {
         // Return the private key as a raw bit array
         let key = self.key.private_key();
-        base64::encode_config(&key.to_vec(), base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(key.to_vec())
     }
 
     /// Convert the public key into a uncompressed, raw base64 string
@@ -105,19 +108,20 @@ impl Key {
         let keybytes = key
             .to_bytes(&group, ec::PointConversionForm::UNCOMPRESSED, &mut ctx)
             .unwrap();
-        base64::encode_config(&keybytes, base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&keybytes)
     }
 
     /// Read the public key from an uncompressed, raw base64 string
-    pub fn from_public_raw(bits: String) -> error::VapidResult<ec::EcKey<Public>> {
+    pub fn from_public_raw(bits: String) -> VapidResult<ec::EcKey<Public>> {
         //Read a public key from a raw bit array
-        let bytes: Vec<u8> =
-            base64::decode_config(&bits.into_bytes(), base64::URL_SAFE_NO_PAD).unwrap();
+        let bytes: Vec<u8> = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(bits.into_bytes())
+            .unwrap_or_default();
         let mut ctx = BigNumContext::new().unwrap();
         let group = ec::EcGroup::from_curve_name(nid::Nid::X9_62_PRIME256V1)?;
         if bytes.len() != 65 || bytes[0] != 4 {
             // It's not a properly tagged key.
-            return Err(error::VapidErrorKind::PublicKey.into());
+            return Err(VapidErrorKind::PublicKey.into());
         }
         let point = ec::EcPoint::from_bytes(&group, &bytes, &mut ctx)?;
         Ok(ec::EcKey::from_public_key(&group, &point)?)
@@ -134,7 +138,7 @@ struct AuthElements {
 }
 
 /// Parse the Authorization Header for useful things.
-fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
+fn parse_auth_token(auth_token: &str) -> Result<AuthElements, VapidError> {
     let mut parts: Vec<&str> = auth_token.split(' ').collect();
     let mut schema = parts.remove(0).to_lowercase();
     // Ignore the first token if it's the header line.
@@ -153,7 +157,10 @@ fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
                     "t" => {
                         let ts: Vec<String> = kv[1].split('.').map(String::from).collect();
                         if ts.len() != 3 {
-                            return Err("Invalid t token specified".into());
+                            return Err(VapidErrorKind::Protocol(
+                                "Invalid t token specified".to_owned(),
+                            )
+                            .into());
                         }
                         let ttoken = format!("{}.{}", ts[0], ts[1]);
                         reply.t = vec![ttoken, ts[2].clone()];
@@ -166,7 +173,11 @@ fn parse_auth_token(auth_token: &str) -> Result<AuthElements, String> {
         "webpush" => {
             reply.t = parts[0].split('.').map(String::from).collect();
         }
-        _ => return Err(format!("Unknown schema type: {}", parts[0])),
+        _ => {
+            return Err(
+                VapidErrorKind::Protocol(format!("Unknown schema type: {}", parts[0])).into(),
+            );
+        }
     };
     Ok(reply)
 }
@@ -186,7 +197,7 @@ fn to_secs(t: SystemTime) -> u64 {
 pub fn sign<S: BuildHasher>(
     key: Key,
     claims: &mut HashMap<String, serde_json::Value, S>,
-) -> error::VapidResult<String> {
+) -> VapidResult<String> {
     // this is the common, static header for all VAPID JWT objects.
     let prefix: String = "{\"typ\":\"JWT\",\"alg\":\"ES256\"}".into();
 
@@ -194,14 +205,14 @@ pub fn sign<S: BuildHasher>(
     match claims.get("sub") {
         Some(sub) => {
             if !sub.as_str().unwrap().starts_with("mailto") {
-                return Err(error::VapidErrorKind::Protocol(
+                return Err(VapidErrorKind::Protocol(
                     "'sub' not a valid HTML reference".to_owned(),
                 )
                 .into());
             }
         }
         None => {
-            return Err(error::VapidErrorKind::Protocol("'sub' not found".to_owned()).into());
+            return Err(VapidErrorKind::Protocol("'sub' not found".to_owned()).into());
         }
     }
     let today = SystemTime::now();
@@ -213,31 +224,27 @@ pub fn sign<S: BuildHasher>(
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
             if (exp_val as u64) < to_secs(today) {
-                return Err(
-                    error::VapidErrorKind::Protocol(r#""exp" already expired"#.to_owned()).into(),
-                );
+                return Err(VapidErrorKind::Protocol(r#""exp" already expired"#.to_owned()).into());
             }
             if (exp_val as u64) > to_secs(tomorrow) {
-                return Err(error::VapidErrorKind::Protocol(
-                    r#""exp" set too far ahead"#.to_owned(),
-                )
-                .into());
+                return Err(
+                    VapidErrorKind::Protocol(r#""exp" set too far ahead"#.to_owned()).into(),
+                );
             }
         }
         None => {
             // We already do an insertion on empty, so this should never trigger.
-            return Err(error::VapidErrorKind::Protocol(
-                r#""exp" failed to initialize"#.to_owned(),
-            )
-            .into());
+            return Err(
+                VapidErrorKind::Protocol(r#""exp" failed to initialize"#.to_owned()).into(),
+            );
         }
     }
 
     let json: String = serde_json::to_string(&claims)?;
     let content = format!(
         "{}.{}",
-        base64::encode_config(&prefix, base64::URL_SAFE_NO_PAD),
-        base64::encode_config(&json, base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&prefix),
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&json)
     );
     let auth_k = key.to_public_raw();
     let pub_key = PKey::from_ec_key(key.key)?;
@@ -245,17 +252,17 @@ pub fn sign<S: BuildHasher>(
     let mut signer = match Signer::new(MessageDigest::sha256(), &pub_key) {
         Ok(t) => t,
         Err(err) => {
-            return Err(error::VapidErrorKind::Protocol(format!(
-                "Could not sign the claims: {:?}",
-                err
-            ))
-            .into());
+            return Err(
+                VapidErrorKind::Protocol(format!("Could not sign the claims: {:?}", err)).into(),
+            );
         }
     };
-    signer
-        .update(&content.clone().into_bytes())
-        .expect("Could not encode data for signature");
-    let signature = signer.sign_to_vec().expect("Could not finalize signature");
+    signer.update(&content.clone().into_bytes()).map_err(|e| {
+        VapidErrorKind::Protocol(format!("Could not encode data for signature: {:?}", e))
+    })?;
+    let signature = signer
+        .sign_to_vec()
+        .map_err(|e| VapidErrorKind::Protocol(format!("Could not finalize signature: {:?}", e)))?;
 
     // Decode signature BER to r,s pair
     let r_off: usize = 3;
@@ -279,14 +286,12 @@ pub fn sign<S: BuildHasher>(
     let mut sigval: Vec<u8> = Vec::with_capacity(64);
     sigval.extend(r_val);
     sigval.extend(s_val);
+    let conv = unsafe { String::from_utf8_unchecked(sigval) };
 
     let auth_t = format!(
         "{}.{}",
         content,
-        base64::encode_config(
-            unsafe { &String::from_utf8_unchecked(sigval) },
-            base64::URL_SAFE_NO_PAD,
-        )
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&conv)
     );
 
     Ok(format!(
@@ -296,28 +301,23 @@ pub fn sign<S: BuildHasher>(
 }
 
 /// Verify that the auth token string matches for the verification token string
-pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, String> {
-    let auth_token = parse_auth_token(&auth_token).expect("Authorization header is invalid.");
-    let pub_ec_key =
-        Key::from_public_raw(auth_token.k).expect("'k' token is not a valid public key");
-    let pub_key = &match PKey::from_ec_key(pub_ec_key) {
-        Ok(key) => key,
-        Err(err) => return Err(format!("Public Key Generation error: {:?}", err)),
-    };
-    let mut verifier = match Verifier::new(MessageDigest::sha256(), pub_key) {
-        Ok(verifier) => verifier,
-        Err(err) => return Err(format!("Verifier failed to initialize: {:?}", err)),
-    };
+pub fn verify(auth_token: String) -> VapidResult<HashMap<String, serde_json::Value>> {
+    let auth_token = parse_auth_token(&auth_token)?;
+    let pub_ec_key = Key::from_public_raw(auth_token.k)?;
+    let pub_key = &PKey::from_ec_key(pub_ec_key)
+        .map_err(|e| VapidErrorKind::Internal(format!("Public Key Generation error: {:?}", e)))?;
+    let mut verifier = Verifier::new(MessageDigest::sha256(), pub_key)
+        .map_err(|e| VapidErrorKind::Internal(format!("Verifier failed to initialize: {:?}", e)))?;
 
     let data = &auth_token.t[0].clone().into_bytes();
-    let verif_sig = base64::decode_config(
-        &auth_token.t[1].clone().into_bytes(),
-        base64::URL_SAFE_NO_PAD,
-    )
-    .expect("Signature failed to decode from base64");
-    verifier
-        .update(data)
-        .expect("Data failed to load into verifier");
+    let verif_sig = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(auth_token.t[1].clone().into_bytes())
+        .map_err(|e| {
+            VapidErrorKind::Internal(format!("Signature failed to decode from base64: {:?}", e))
+        })?;
+    verifier.update(data).map_err(|e| {
+        VapidErrorKind::Internal(format!("Data failed to load into verifier: {:?}", e))
+    })?;
 
     // Extract the values from the combined raw key.
     let mut r_val = Vec::with_capacity(32);
@@ -355,16 +355,24 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
             // Success! Return the decoded claims.
             let token = auth_token.t[0].clone();
             let claim_data: Vec<&str> = token.split('.').collect();
-            let bytes = base64::decode_config(&claim_data[1], base64::URL_SAFE_NO_PAD)
-                .expect("Claims were not properly base64 encoded");
-            Ok(serde_json::from_str(
-                &String::from_utf8(bytes)
-                    .expect("Claims included an invalid character and could not be decoded."),
-            )
-            .expect("Claims are not valid JSON"))
+            let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(claim_data[1])
+                .map_err(|e| {
+                    VapidErrorKind::Protocol(format!(
+                        "Claims were not properly base64 encoded: {:?}",
+                        e
+                    ))
+                })?;
+            Ok(serde_json::from_str(&String::from_utf8(bytes).map_err(|e| {
+                VapidErrorKind::Protocol(format!(
+                    "Claims included an invalid character and could not be decoded: {:?}",
+                    e
+                ))
+            })?)
+            .map_err(|e| VapidErrorKind::Internal(format!("Could not encode to json: {:?}", e)))?)
         }
-        Ok(false) => Err("Verify failed".to_string()),
-        Err(err) => Err(format!("Verify failed {:?}", err)),
+        Ok(false) => Err(VapidErrorKind::Protocol("Verify failed".to_string()).into()),
+        Err(err) => Err(VapidErrorKind::Internal(format!("Verify failed {:?}", err)).into()),
     }
 }
 
@@ -421,16 +429,22 @@ mod tests {
         let token: Vec<&str> = auth_parts.get("t").unwrap().split('.').collect();
         assert_eq!(token.len(), 3);
 
-        let content =
-            String::from_utf8(base64::decode_config(token[0], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content = String::from_utf8(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(token[0])
+                .unwrap(),
+        )
+        .unwrap();
         let items: HashMap<String, String> = serde_json::from_str(&content).unwrap();
         assert!(items.contains_key("typ"));
         assert!(items.contains_key("alg"));
 
-        let content: String =
-            String::from_utf8(base64::decode_config(token[1], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content: String = String::from_utf8(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(token[1])
+                .unwrap(),
+        )
+        .unwrap();
         let items: HashMap<String, serde_json::Value> = serde_json::from_str(&content).unwrap();
 
         assert!(items.contains_key("exp"));
