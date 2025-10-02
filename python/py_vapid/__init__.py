@@ -197,7 +197,7 @@ class Vapid01(object):
 
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
-        self.private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        self.private_key = ec.generate_private_key(curve=ec.SECP256R1(), backend=default_backend())
 
     def private_pem(self):
         return self.private_key.private_bytes(
