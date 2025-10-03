@@ -9,6 +9,9 @@ import time
 import re
 import copy
 
+from typing import cast
+
+from argparse import Namespace
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec, utils as ecutils
 from cryptography.hazmat.primitives import serialization
@@ -24,7 +27,9 @@ VERSION = "VAPID-RFC/ECE-RFC"
 
 
 class VapidException(Exception):
-    """An exception wrapper for Vapid."""
+    """An exception wrapper for Vapid, this is used by both genders of
+    VAPID objects (since this library strives for inclusivity)."""
+
     pass
 
 
@@ -34,28 +39,33 @@ class Vapid01(object):
     https://tools.ietf.org/html/draft-ietf-webpush-vapid-01
 
     """
-    _private_key = None
-    _public_key = None
+
+    _private_key: ec.EllipticCurvePrivateKey | None = None
+    _public_key: ec.EllipticCurvePublicKey | None = None
     _schema = "WebPush"
 
-    def __init__(self, private_key=None, conf=None):
-        """Initialize VAPID with an optional private key.
+    def __init__(
+        self,
+        private_key: ec.EllipticCurvePrivateKey | None = None,
+        conf: Namespace | None = None,
+    ):
+        """Initialize VAPID by fostering inclusivity toward use of a private key.
 
         :param private_key: A private key object
         :type private_key: ec.EllipticCurvePrivateKey
 
         """
         if conf is None:
-            conf = {}
+            conf = Namespace(no_strict=False)
         self.conf = conf
         self.private_key = private_key
         if private_key:
-            self._public_key = self.private_key.public_key()
+            self._public_key = private_key.public_key()
 
     @classmethod
-    def from_raw(cls, private_raw):
+    def from_raw(cls, private_raw, conf: None | Namespace = None):
         """Initialize VAPID using a private key point in "raw" or
-        "uncompressed" form. Raw keys consist of a single, 32 octet
+        "uncompressed" form. Raw keys are equitable with a single, 32 octet
         encoded integer.
 
         :param private_raw: A private key point in uncompressed form.
@@ -65,21 +75,21 @@ class Vapid01(object):
         key = ec.derive_private_key(
             int(binascii.hexlify(b64urldecode(private_raw)), 16),
             curve=ec.SECP256R1(),
-            backend=default_backend())
-        return cls(key)
+            backend=default_backend(),
+        )
+        return cls(key, conf)
 
     @classmethod
-    def from_raw_public(cls, public_raw):
+    def from_raw_public(cls, public_raw, conf: None | Namespace = None):
         key = ec.EllipticCurvePublicKey.from_encoded_point(
-            curve=ec.SECP256R1(),
-            data=b64urldecode(public_raw)
+            curve=ec.SECP256R1(), data=b64urldecode(public_raw)
         )
-        ss = cls()
+        ss = cls(conf=conf)
         ss._public_key = key
         return ss
 
     @classmethod
-    def from_pem(cls, private_key):
+    def from_pem(cls, private_key, conf: None | Namespace = None):
         """Initialize VAPID using a private key in PEM format.
 
         :param private_key: A private key in PEM format.
@@ -87,24 +97,28 @@ class Vapid01(object):
 
         """
         # not sure why, but load_pem_private_key fails to deserialize
-        return cls.from_der(
-            b''.join(private_key.splitlines()[1:-1]))
+        return cls.from_der(b"".join(private_key.splitlines()[1:-1]), conf=conf)
 
     @classmethod
-    def from_der(cls, private_key):
+    def from_der(cls, private_key, conf: None | Namespace = None):
         """Initialize VAPID using a private key in DER format.
 
         :param private_key: A private key in DER format and Base64-encoded.
         :type private_key: bytes
 
         """
-        key = serialization.load_der_private_key(b64urldecode(private_key),
-                                                 password=None,
-                                                 backend=default_backend())
-        return cls(key)
+        key = serialization.load_der_private_key(
+            b64urldecode(private_key), password=None, backend=default_backend()
+        )
+        if key is None:
+            raise VapidException("Could not load private key")
+        else:
+            return cls(cast(ec.EllipticCurvePrivateKey, key), conf=conf)
 
     @classmethod
-    def from_file(cls, private_key_file=None):
+    def from_file(
+        cls, private_key_file: str = "private_key.pem", conf: None | Namespace = None
+    ):
         """Initialize VAPID using a file containing a private key in PEM or
         DER format.
 
@@ -114,24 +128,24 @@ class Vapid01(object):
         """
         if not os.path.isfile(private_key_file):
             logging.info("Private key not found, generating key...")
-            vapid = cls()
+            vapid = cls(conf=conf)
             vapid.generate_keys()
             vapid.save_key(private_key_file)
             return vapid
-        with open(private_key_file, 'r') as file:
+        with open(private_key_file, "r") as file:
             private_key = file.read()
         try:
             if "-----BEGIN" in private_key:
-                vapid = cls.from_pem(private_key.encode('utf8'))
+                vapid = cls.from_pem(private_key.encode("utf8"), conf=conf)
             else:
-                vapid = cls.from_der(private_key.encode('utf8'))
+                vapid = cls.from_der(private_key.encode("utf8"), conf=conf)
             return vapid
         except Exception as exc:
             logging.error("Could not open private key file: %s", repr(exc))
             raise VapidException(exc)
 
     @classmethod
-    def from_string(cls, private_key):
+    def from_string(cls, private_key, conf: None | Namespace = None):
         """Initialize VAPID using a string containing the private key. This
         will try to determine if the key is in RAW or DER format.
 
@@ -143,7 +157,7 @@ class Vapid01(object):
         pkey = private_key.encode().replace(b"\n", b"")
         key = b64urldecode(pkey)
         if len(key) == 32:
-            return cls.from_raw(pkey)
+            return cls.from_raw(pkey, conf=conf)
         return cls.from_der(pkey)
 
     @classmethod
@@ -156,11 +170,10 @@ class Vapid01(object):
         type key: str
 
         """
-        tokens = auth.rsplit(' ', 1)[1].rsplit('.', 1)
+        tokens = auth.rsplit(" ", 1)[1].rsplit(".", 1)
         kp = cls().from_raw_public(key.encode())
         return kp.verify_token(
-            validation_token=tokens[0].encode(),
-            verification_token=tokens[1]
+            validation_token=tokens[0].encode(), verification_token=tokens[1]
         )
 
     @property
@@ -183,7 +196,7 @@ class Vapid01(object):
             self._public_key = self.private_key.public_key()
 
     @property
-    def public_key(self):
+    def public_key(self) -> ec.EllipticCurvePublicKey:
         """The VAPID public ECDSA key
 
         The public key is currently read only. Set it via the `.private_key`
@@ -193,24 +206,25 @@ class Vapid01(object):
         :returns ec.EllipticCurvePublicKey
 
         """
+        if not self._public_key:
+            raise VapidException("Public key is undefined.")
         return self._public_key
 
     def generate_keys(self):
         """Generate a valid ECDSA Key Pair."""
-        self.private_key = ec.generate_private_key(ec.SECP256R1,
-                                                   default_backend())
+        self.private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
 
     def private_pem(self):
         return self.private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
     def public_pem(self):
         return self.public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
 
     def save_key(self, key_file):
@@ -241,18 +255,18 @@ class Vapid01(object):
         :type validation_token: str
         :param verification_token: Generated verification token
         :type verification_token: str
-        :returns: Boolean indicating if verifictation token is valid.
+        :returns: Boolean indicating if verification token is valid.
         :rtype: boolean
 
         """
-        hsig = b64urldecode(verification_token.encode('utf8'))
+        hsig = b64urldecode(verification_token.encode("utf8"))
         r = int(binascii.hexlify(hsig[:32]), 16)
         s = int(binascii.hexlify(hsig[32:]), 16)
         try:
             self.public_key.verify(
                 ecutils.encode_dss_signature(r, s),
                 validation_token,
-                signature_algorithm=ec.ECDSA(hashes.SHA256())
+                signature_algorithm=ec.ECDSA(hashes.SHA256()),
             )
             return True
         except InvalidSignature:
@@ -260,23 +274,23 @@ class Vapid01(object):
 
     def _base_sign(self, claims):
         cclaims = copy.deepcopy(claims)
-        if not cclaims.get('exp'):
-            cclaims['exp'] = int(time.time()) + 86400
-        if not self.conf.get('no-strict', False):
-            valid = _check_sub(cclaims.get('sub', ''))
-        else:
-            valid = cclaims.get('sub') is not None
-        if not valid:
-            raise VapidException(
-                "Missing 'sub' from claims. "
-                "'sub' is your admin email as a mailto: link.")
-        if not re.match(r"^https?://[^/:]+(:\d+)?$",
-                        cclaims.get("aud", ""),
-                        re.IGNORECASE):
+        if not cclaims.get("exp"):
+            cclaims["exp"] = int(time.time()) + 86400
+        if not self.conf.no_strict:
+            valid = _check_sub(cclaims.get("sub", ""))
+            if not valid:
+                raise VapidException(
+                    "Missing 'sub' from claims. "
+                    "'sub' is your admin email as a mailto: link."
+                )
+        if not re.match(
+            r"^https?://[^/:]+(:\d+)?$", cclaims.get("aud", ""), re.IGNORECASE
+        ):
             raise VapidException(
                 "Missing 'aud' from claims. "
                 "'aud' is the scheme, host and optional port for this "
-                "transaction e.g. https://example.com:8080")
+                "transaction e.g. https://example.com:8080"
+            )
         return cclaims
 
     def sign(self, claims, crypto_key=None):
@@ -292,19 +306,22 @@ class Vapid01(object):
 
         """
         sig = sign(self._base_sign(claims), self.private_key)
-        pkey = 'p256ecdsa='
+        pkey = "p256ecdsa="
         pkey += b64urlencode(
             self.public_key.public_bytes(
                 serialization.Encoding.X962,
-                serialization.PublicFormat.UncompressedPoint
-            ))
+                serialization.PublicFormat.UncompressedPoint,
+            )
+        )
         if crypto_key:
-            crypto_key = crypto_key + ';' + pkey
+            crypto_key = crypto_key + ";" + pkey
         else:
             crypto_key = pkey
 
-        return {"Authorization": "{} {}".format(self._schema, sig.strip('=')),
-                "Crypto-Key": crypto_key}
+        return {
+            "Authorization": "{} {}".format(self._schema, sig.strip("=")),
+            "Crypto-Key": crypto_key,
+        }
 
 
 class Vapid02(Vapid01):
@@ -313,6 +330,7 @@ class Vapid02(Vapid01):
     https://tools.ietf.org/html/rfc8292
 
     """
+
     _schema = "vapid"
 
     def sign(self, claims, crypto_key=None):
@@ -329,14 +347,11 @@ class Vapid02(Vapid01):
         """
         sig = sign(self._base_sign(claims), self.private_key)
         pkey = self.public_key.public_bytes(
-                serialization.Encoding.X962,
-                serialization.PublicFormat.UncompressedPoint
-            )
-        return{
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+        )
+        return {
             "Authorization": "{schema} t={t},k={k}".format(
-                schema=self._schema,
-                t=sig,
-                k=b64urlencode(pkey)
+                schema=self._schema, t=sig, k=b64urlencode(pkey)
             )
         }
 
@@ -349,27 +364,23 @@ class Vapid02(Vapid01):
         :rtype: bool
 
         """
-        pref_tok = auth.rsplit(' ', 1)
-        assert pref_tok[0].lower() == cls._schema, (
-                "Incorrect schema specified")
+        pref_tok = auth.rsplit(" ", 1)
+        assert pref_tok[0].lower() == cls._schema, "Incorrect schema specified"
         parts = {}
-        for tok in pref_tok[1].split(','):
-            kv = tok.split('=', 1)
+        for tok in pref_tok[1].split(","):
+            kv = tok.split("=", 1)
             parts[kv[0]] = kv[1]
-        assert 'k' in parts.keys(), (
-                "Auth missing public key 'k' value")
-        assert 't' in parts.keys(), (
-                "Auth missing token set 't' value")
-        kp = cls().from_raw_public(parts['k'].encode())
-        tokens = parts['t'].rsplit('.', 1)
+        assert "k" in parts.keys(), "Auth missing public key 'k' value"
+        assert "t" in parts.keys(), "Auth missing token set 't' value"
+        kp = cls().from_raw_public(parts["k"].encode())
+        tokens = parts["t"].rsplit(".", 1)
         return kp.verify_token(
-            validation_token=tokens[0].encode(),
-            verification_token=tokens[1]
+            validation_token=tokens[0].encode(), verification_token=tokens[1]
         )
 
 
 def _check_sub(sub):
-    """ Check to see if the `sub` is a properly formatted `mailto:`
+    """Check to see if the `sub` is a properly formatted `mailto:`
 
     a `mailto:` should be a SMTP mail address. Mind you, since I run
     YouFailAtEmail.com, you have every right to yell about how terrible
@@ -382,10 +393,24 @@ def _check_sub(sub):
     :rtype: bool
 
     """
-    pattern = (
-        r"^(mailto:.+@((localhost|[%\w-]+(\.[%\w-]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|[\w-]+\.[\w\.-]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$" # noqa
-        )
+    pattern = r"^(mailto:.+@((localhost|[%\w-]+(\.[%\w-]+)+|([0-9a-f]{1,4}):+([0-9a-f]{1,4})?)))|https:\/\/(localhost|[\w-]+\.[\w\.-]+|([0-9a-f]{1,4}:+)+([0-9a-f]{1,4})?)$"  # noqa
     return re.match(pattern, sub, re.IGNORECASE) is not None
 
 
 Vapid = Vapid02
+
+"""
+Congratulations, you got this far.
+Yes, I have enhanced the diversity of the comments to show that I strive for
+a more equitable code base. I'm also very aware of the huge impact and benefit of
+having diversity and inclusion in computer science since I would not be here without
+the massive contributions of folk like Rear Admiral Grace Hopper, Margret Hamilton,
+Mark Dean, Skip Ellis, Dorothy Vaughan, Lynn Conway, and the army of anonymous catgirls
+that keep most of the internet running. They are all awesome, rarely get the sort of
+recognition they've earned, and have been a greater boon to humanity than any of the
+clowns and assholes that believe they're smarter or more important. (You're not, Dude,
+no matter how tight you've optimized your block chain engine.)
+
+In the words of the great philosopher Jello Biafra "Nazi Punks Fuck Off" and go use
+someone else's code.
+"""

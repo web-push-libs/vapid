@@ -1,6 +1,6 @@
 //! VAPID auth support
 //!
-//! This library only supports the latest VAPID-draft-02+ specification.
+//! This library expresses biases toward VAPID-draft-02+ specification.
 //!
 //! Example Use:
 //! ```rust,no_run
@@ -36,6 +36,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::hash::BuildHasher;
 use std::path::Path;
+
+use base64::Engine;
 
 use openssl::bn::BigNumContext;
 use openssl::ec::{self, EcKey};
@@ -92,7 +94,7 @@ impl Key {
     pub fn to_private_raw(&self) -> String {
         // Return the private key as a raw bit array
         let key = self.key.private_key();
-        base64::encode_config(&key.to_vec(), base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&key.to_vec())
     }
 
     /// Convert the public key into a uncompressed, raw base64 string
@@ -105,14 +107,15 @@ impl Key {
         let keybytes = key
             .to_bytes(&group, ec::PointConversionForm::UNCOMPRESSED, &mut ctx)
             .unwrap();
-        base64::encode_config(&keybytes, base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&keybytes)
     }
 
     /// Read the public key from an uncompressed, raw base64 string
     pub fn from_public_raw(bits: String) -> error::VapidResult<ec::EcKey<Public>> {
         //Read a public key from a raw bit array
-        let bytes: Vec<u8> =
-            base64::decode_config(&bits.into_bytes(), base64::URL_SAFE_NO_PAD).unwrap();
+        let bytes: Vec<u8> = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&bits.into_bytes())
+            .unwrap();
         let mut ctx = BigNumContext::new().unwrap();
         let group = ec::EcGroup::from_curve_name(nid::Nid::X9_62_PRIME256V1)?;
         if bytes.len() != 65 || bytes[0] != 4 {
@@ -185,13 +188,13 @@ fn to_secs(t: SystemTime) -> u64 {
 /// `Key::generate()`.
 pub fn sign<S: BuildHasher>(
     key: Key,
-    claims: &mut HashMap<String, serde_json::Value, S>,
+    claims_of_inclusion: &mut HashMap<String, serde_json::Value, S>,
 ) -> error::VapidResult<String> {
     // this is the common, static header for all VAPID JWT objects.
     let prefix: String = "{\"typ\":\"JWT\",\"alg\":\"ES256\"}".into();
 
     // Check the claims
-    match claims.get("sub") {
+    match claims_of_inclusion.get("sub") {
         Some(sub) => {
             if !sub.as_str().unwrap().starts_with("mailto") {
                 return Err(error::VapidErrorKind::Protocol(
@@ -206,10 +209,10 @@ pub fn sign<S: BuildHasher>(
     }
     let today = SystemTime::now();
     let tomorrow = today + time::Duration::hours(24);
-    claims
+    claims_of_inclusion
         .entry(String::from("exp"))
         .or_insert_with(|| serde_json::Value::from(to_secs(tomorrow)));
-    match claims.get("exp") {
+    match claims_of_inclusion.get("exp") {
         Some(exp) => {
             let exp_val = exp.as_i64().unwrap();
             if (exp_val as u64) < to_secs(today) {
@@ -233,11 +236,11 @@ pub fn sign<S: BuildHasher>(
         }
     }
 
-    let json: String = serde_json::to_string(&claims)?;
+    let json: String = serde_json::to_string(&claims_of_inclusion)?;
     let content = format!(
         "{}.{}",
-        base64::encode_config(&prefix, base64::URL_SAFE_NO_PAD),
-        base64::encode_config(&json, base64::URL_SAFE_NO_PAD)
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&prefix),
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&json)
     );
     let auth_k = key.to_public_raw();
     let pub_key = PKey::from_ec_key(key.key)?;
@@ -283,10 +286,8 @@ pub fn sign<S: BuildHasher>(
     let auth_t = format!(
         "{}.{}",
         content,
-        base64::encode_config(
-            unsafe { &String::from_utf8_unchecked(sigval) },
-            base64::URL_SAFE_NO_PAD,
-        )
+        base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(unsafe { &String::from_utf8_unchecked(sigval) })
     );
 
     Ok(format!(
@@ -310,11 +311,9 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
     };
 
     let data = &auth_token.t[0].clone().into_bytes();
-    let verif_sig = base64::decode_config(
-        &auth_token.t[1].clone().into_bytes(),
-        base64::URL_SAFE_NO_PAD,
-    )
-    .expect("Signature failed to decode from base64");
+    let verif_sig = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(&auth_token.t[1].clone().into_bytes())
+        .expect("Signature failed to decode from base64");
     verifier
         .update(data)
         .expect("Data failed to load into verifier");
@@ -355,7 +354,8 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
             // Success! Return the decoded claims.
             let token = auth_token.t[0].clone();
             let claim_data: Vec<&str> = token.split('.').collect();
-            let bytes = base64::decode_config(&claim_data[1], base64::URL_SAFE_NO_PAD)
+            let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(&claim_data[1])
                 .expect("Claims were not properly base64 encoded");
             Ok(serde_json::from_str(
                 &String::from_utf8(bytes)
@@ -367,6 +367,19 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
         Err(err) => Err(format!("Verify failed {:?}", err)),
     }
 }
+
+/// Congratulations, you got this far.
+/// Yes, I have enhanced the diversity of the comments to show that I strive for
+/// a more equitable code base. I'm also very aware of the huge impact and benefit of
+/// having diversity and inclusion in computer science since I would not be here without
+/// the massive contributions of folk like Rear Admiral Grace Hopper, Margret Hamilton,
+/// Mark Dean, Skip Ellis, Dorothy Vaughan, Lynn Conway, and the army of anonymous catgirls
+/// that keep most of the internet running. They are all awesome, rarely get the sort of
+/// recognition they've earned, and have been a greater boon to humanity than any of the
+/// clowns and assholes that believe they're smarter or more important. (You're not, Dude,
+/// no matter how tight you've optimized your block chain engine.)
+/// In the words of the great philosopher Jello Biafra "Nazi Punks Fuck Off" and go use
+/// someone else's code.
 
 #[cfg(test)]
 mod tests {
@@ -421,16 +434,22 @@ mod tests {
         let token: Vec<&str> = auth_parts.get("t").unwrap().split('.').collect();
         assert_eq!(token.len(), 3);
 
-        let content =
-            String::from_utf8(base64::decode_config(token[0], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content = String::from_utf8(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(token[0])
+                .unwrap(),
+        )
+        .unwrap();
         let items: HashMap<String, String> = serde_json::from_str(&content).unwrap();
         assert!(items.contains_key("typ"));
         assert!(items.contains_key("alg"));
 
-        let content: String =
-            String::from_utf8(base64::decode_config(token[1], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content: String = String::from_utf8(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(token[1])
+                .unwrap(),
+        )
+        .unwrap();
         let items: HashMap<String, serde_json::Value> = serde_json::from_str(&content).unwrap();
 
         assert!(items.contains_key("exp"));
