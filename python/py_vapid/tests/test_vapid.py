@@ -5,7 +5,10 @@ import os
 import json
 import unittest
 from cryptography.hazmat.primitives import serialization
-from mock import patch, Mock
+try:
+    from unittest.mock import patch, Mock
+except ImportError:
+    from mock import patch, Mock
 
 from py_vapid import Vapid01, Vapid02, VapidException, _check_sub
 from py_vapid.jwt import decode
