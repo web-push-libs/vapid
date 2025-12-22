@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# dependencies = ["cryptography>=2.5"]
+dynamic = ["version", "description"]
+name = "py-vapid"
+authors = [{ name = "JR Conlin", email = "src+vapidwebpusher@jrconlin.com" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+keywords = ["vapid", "webpush", "notification"]
+classifiers = [
+    "Topic :: Internet :: WWW/HTTP",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/web-push-libs/vapid/tree/main/python"
+
+[project.optional-dependencies]
+dev = ["black", "mock", "pytest"]
+
+[project.scripts]
+vapid = "py_vapid.main:main"
