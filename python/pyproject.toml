@@ -1,30 +1,32 @@
+# For `venv` use `pip install .`
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "pytest"]
+build-backend = "hatchling.build"
 
 [project]
-name        = "py-vapid"
-version     = "1.9.2"
-license     = {text = "MPL-2.0"}
+name = "py-vapid"
+version = "1.9.3"
+license = { text = "MPL-2.0" }
 description = "Simple VAPID header generation library"
-readme      = "README.rst"
-authors     = [{name = "JR Conlin", email = "src+vapid@jrconlin.com"}]
-keywords    = ["vapid", "push", "webpush"]
+readme = "README.rst"
+authors = [{ name = "JR Conlin", email = "src+vapid@jrconlin.com" }]
+keywords = ["vapid", "push", "webpush"]
 classifiers = [
     "Topic :: Internet :: WWW/HTTP",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-dynamic = ["dependencies"]
+dependencies = [
+    "cryptography>=46"
+]
+
+# Remember, to install these use `pip install .[test]`
+[project.optional-dependencies]
+test = ["pytest", "mock>=1.0", "coverage", "flake8"]
+
 
 [project.urls]
 Homepage = "https://github.com/mozilla-services/vapid"
 
 [project.scripts]
 vapid = "py_vapid.main:main"
-
-[tool.setuptools.dynamic]
-dependencies = {file = "requirements.txt"}
-
-[tool.setuptools.packages.find]
-include = ["py_vapid*"]
