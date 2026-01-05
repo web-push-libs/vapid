@@ -1,6 +1,6 @@
 [package]
 name = "vapid"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["jrconlin <jconlin+git@mozilla.com>"]
 edition = "2021"
 description = "An implementation of the RFC 8292 Voluntary Application Server Identification (VAPID) Auth header generator"
@@ -13,4 +13,4 @@ openssl = "0.10"
 serde_json = "1.0"
 base64 = "0.13"
 time = "0.3"
-thiserror = "1.0"
+thiserror = "2.0"
