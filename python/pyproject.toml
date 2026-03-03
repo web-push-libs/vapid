@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "py-vapid"
-version = "1.9.3"
+version = "1.9.5"
 license = { text = "MPL-2.0" }
 description = "Simple VAPID header generation library"
 readme = "README.rst"

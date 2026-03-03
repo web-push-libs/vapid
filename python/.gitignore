@@ -1,1 +1,10 @@
 .eggs/
+venv/
+.venv/
+*.der
+*.pem
+old/
+**/.vscode
+**/.idea
+**/claims*.json
+
