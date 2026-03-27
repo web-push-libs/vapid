@@ -37,6 +37,8 @@ use std::fs;
 use std::hash::BuildHasher;
 use std::path::Path;
 
+use base64::Engine;
+
 use openssl::bn::BigNumContext;
 use openssl::ec::{self, EcKey};
 use openssl::hash::MessageDigest;
@@ -53,6 +55,14 @@ mod error;
 #[derive(Clone)]
 pub struct Key {
     key: EcKey<Private>,
+}
+
+pub fn b64_decode_url(input: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(input.trim_end_matches('='))
+}
+
+pub fn b64_encode_url(input: &Vec<u8>) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input)
 }
 
 impl Key {
@@ -92,7 +102,7 @@ impl Key {
     pub fn to_private_raw(&self) -> String {
         // Return the private key as a raw bit array
         let key = self.key.private_key();
-        base64::encode_config(&key.to_vec(), base64::URL_SAFE_NO_PAD)
+        b64_encode_url(&key.to_vec())
     }
 
     /// Convert the public key into a uncompressed, raw base64 string
@@ -105,14 +115,13 @@ impl Key {
         let keybytes = key
             .to_bytes(&group, ec::PointConversionForm::UNCOMPRESSED, &mut ctx)
             .unwrap();
-        base64::encode_config(&keybytes, base64::URL_SAFE_NO_PAD)
+        b64_encode_url(&keybytes)
     }
 
     /// Read the public key from an uncompressed, raw base64 string
     pub fn from_public_raw(bits: String) -> error::VapidResult<ec::EcKey<Public>> {
         //Read a public key from a raw bit array
-        let bytes: Vec<u8> =
-            base64::decode_config(&bits.into_bytes(), base64::URL_SAFE_NO_PAD).unwrap();
+        let bytes: Vec<u8> = b64_decode_url(&bits).unwrap();
         let mut ctx = BigNumContext::new().unwrap();
         let group = ec::EcGroup::from_curve_name(nid::Nid::X9_62_PRIME256V1)?;
         if bytes.len() != 65 || bytes[0] != 4 {
@@ -236,8 +245,8 @@ pub fn sign<S: BuildHasher>(
     let json: String = serde_json::to_string(&claims)?;
     let content = format!(
         "{}.{}",
-        base64::encode_config(&prefix, base64::URL_SAFE_NO_PAD),
-        base64::encode_config(&json, base64::URL_SAFE_NO_PAD)
+        b64_encode_url(&prefix.into_bytes()),
+        b64_encode_url(&json.into_bytes())
     );
     let auth_k = key.to_public_raw();
     let pub_key = PKey::from_ec_key(key.key)?;
@@ -280,14 +289,7 @@ pub fn sign<S: BuildHasher>(
     sigval.extend(r_val);
     sigval.extend(s_val);
 
-    let auth_t = format!(
-        "{}.{}",
-        content,
-        base64::encode_config(
-            unsafe { &String::from_utf8_unchecked(sigval) },
-            base64::URL_SAFE_NO_PAD,
-        )
-    );
+    let auth_t = format!("{}.{}", content, b64_encode_url(&sigval));
 
     Ok(format!(
         "Authorization: {} t={},k={}",
@@ -310,11 +312,8 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
     };
 
     let data = &auth_token.t[0].clone().into_bytes();
-    let verif_sig = base64::decode_config(
-        &auth_token.t[1].clone().into_bytes(),
-        base64::URL_SAFE_NO_PAD,
-    )
-    .expect("Signature failed to decode from base64");
+    let verif_sig =
+        b64_decode_url(&auth_token.t[1]).expect("Signature failed to decode from base64");
     verifier
         .update(data)
         .expect("Data failed to load into verifier");
@@ -355,8 +354,8 @@ pub fn verify(auth_token: String) -> Result<HashMap<String, serde_json::Value>, 
             // Success! Return the decoded claims.
             let token = auth_token.t[0].clone();
             let claim_data: Vec<&str> = token.split('.').collect();
-            let bytes = base64::decode_config(&claim_data[1], base64::URL_SAFE_NO_PAD)
-                .expect("Claims were not properly base64 encoded");
+            let bytes =
+                b64_decode_url(&claim_data[1]).expect("Claims were not properly base64 encoded");
             Ok(serde_json::from_str(
                 &String::from_utf8(bytes)
                     .expect("Claims included an invalid character and could not be decoded."),
@@ -421,16 +420,12 @@ mod tests {
         let token: Vec<&str> = auth_parts.get("t").unwrap().split('.').collect();
         assert_eq!(token.len(), 3);
 
-        let content =
-            String::from_utf8(base64::decode_config(token[0], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content = String::from_utf8(b64_decode_url(token[0]).unwrap()).unwrap();
         let items: HashMap<String, String> = serde_json::from_str(&content).unwrap();
         assert!(items.contains_key("typ"));
         assert!(items.contains_key("alg"));
 
-        let content: String =
-            String::from_utf8(base64::decode_config(token[1], base64::URL_SAFE_NO_PAD).unwrap())
-                .unwrap();
+        let content: String = String::from_utf8(b64_decode_url(token[1]).unwrap()).unwrap();
         let items: HashMap<String, serde_json::Value> = serde_json::from_str(&content).unwrap();
 
         assert!(items.contains_key("exp"));
