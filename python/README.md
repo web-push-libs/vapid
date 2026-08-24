@@ -23,18 +23,22 @@ fields.
 At a minimum a VAPID claim set should look like:
 
 ```json
-{"sub":"mailto:YourEmail@YourSite.com","aud":"https://PushServer","exp":"ExpirationTimestamp"}
+{
+  "sub": "mailto:YourEmail@YourSite.com",
+  "aud": "https://PushServer",
+  "exp": "ExpirationTimestamp"
+}
 ```
 
 A few notes:
 
-***sub*** is the email address you wish to have on record for this
+**_sub_** is the email address you wish to have on record for this
 request, prefixed with "`mailto:`". If things go wrong, this is the
 email that will be used to contact you (for instance). This can be a
 general delivery address like "`mailto:push_operations@example.com`" or a
 specific address like "`mailto:bob@example.com`".
 
-***aud*** is the audience for the VAPID. This is the scheme and host
+**_aud_** is the audience for the VAPID. This is the scheme and host
 you use to send subscription endpoints and generally coincides with
 the `endpoint` specified in the Subscription Info block.
 
@@ -46,7 +50,7 @@ then the `aud` would be "`https://push.example.com:8012`"
 While some Push Services consider this an optional field, others may
 be stricter.
 
-***exp*** This is the UTC timestamp for when this VAPID request will
+**_exp_** This is the UTC timestamp for when this VAPID request will
 expire. The maximum period is 24 hours. Setting a shorter period can
 prevent "replay" attacks. Setting a longer period allows you to reuse
 headers for multiple sends (e.g. if you're sending hundreds of updates

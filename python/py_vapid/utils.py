@@ -11,7 +11,7 @@ def b64urldecode(data):
     :returns bytes
 
     """
-    return base64.urlsafe_b64decode(data + b"===="[len(data) % 4:])
+    return base64.urlsafe_b64decode(data + b"===="[len(data) % 4 :])
 
 
 def b64urlencode(data):
@@ -23,7 +23,7 @@ def b64urlencode(data):
     :returns str
 
     """
-    return base64.urlsafe_b64encode(data).replace(b'=', b'').decode('utf8')
+    return base64.urlsafe_b64encode(data).replace(b"=", b"").decode("utf8")
 
 
 def num_to_bytes(n, pad_to):
@@ -34,6 +34,6 @@ def num_to_bytes(n, pad_to):
     :type pad_to: int
     :returns bytes
     """
-    h = '%x' % n
-    r = binascii.unhexlify('0' * (len(h) % 2) + h)
-    return b'\x00' * (pad_to - len(r)) + r
+    h = "%x" % n
+    r = binascii.unhexlify("0" * (len(h) % 2) + h)
+    return b"\x00" * (pad_to - len(r)) + r

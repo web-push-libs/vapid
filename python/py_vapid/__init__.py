@@ -2,22 +2,21 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import os
-import logging
 import binascii
-import time
-import re
 import copy
+import logging
+import os
+import re
+import time
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import ec, utils as ecutils
-from cryptography.hazmat.primitives import serialization
-
-from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import utils as ecutils
 
-from py_vapid.utils import b64urldecode, b64urlencode
 from py_vapid.jwt import sign
+from py_vapid.utils import b64urldecode, b64urlencode
 
 # Show compliance version. For earlier versions see previously tagged releases.
 VERSION = "VAPID-RFC/ECE-RFC"
