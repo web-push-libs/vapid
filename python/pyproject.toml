@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "py-vapid"
-version = "1.9.3"
+version = "1.9.4"
 license = { text = "MPL-2.0" }
 description = "Simple VAPID header generation library"
 readme = "README.rst"
@@ -16,9 +16,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-dependencies = [
-    "cryptography>=46"
-]
+dependencies = ["cryptography>=46"]
 
 # Remember, to install these use `pip install .[test]`
 [project.optional-dependencies]
